@@ -437,7 +437,7 @@ net.on('gameEnd', ({ winner, mode, isCpu, results }) => {
 
   $('result-title').textContent = iWon ? '🎉 勝利!' : '😭 敗北…';
   const wname = winner === 'oni' ? '👹 鬼チームの勝ち!' : '🏃 逃げチームの勝ち!';
-  $('result-winner').textContent = (mode === 'kawari' ? '⏱ タイムアップ!' : wname) + (isCpu ? ' 〔CPU戦〕' : '');
+  $('result-winner').innerHTML = esc(mode === 'kawari' ? '⏱ タイムアップ!' : wname) + (isCpu ? ' <span class="nowrap">〔CPU戦〕</span>' : '');
   $('result-list').innerHTML = results.map(r => {
     const stats = mode === 'kawari'
       ? `タッチ${r.tags} / 鬼時間${r.oniTime}秒`
