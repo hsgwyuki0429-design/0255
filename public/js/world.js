@@ -1,12 +1,12 @@
 // マップデータ → Three.js シーン構築 + 衝突用AABBリスト生成
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { MAPS } from '/shared/mapdata.js';
+import { MAPS, solidsOf } from '/shared/mapdata.js';
 
 export function buildWorld(scene, mapId, quality) {
   const map = MAPS[mapId];
   const group = new THREE.Group();
-  const solids = [];
+  const solids = solidsOf(map);
 
   // 色+材質ごとにジオメトリをマージして描画コールを削減
   const buckets = new Map();
@@ -17,13 +17,6 @@ export function buildWorld(scene, mapId, quality) {
     const g = new THREE.BoxGeometry(b.w, b.h, b.d);
     g.translate(b.x, b.y + b.h / 2, b.z);
     buckets.get(key).push(g);
-    if (!b.deco) {
-      solids.push({
-        minX: b.x - b.w / 2, maxX: b.x + b.w / 2,
-        minY: b.y, maxY: b.y + b.h,
-        minZ: b.z - b.d / 2, maxZ: b.z + b.d / 2
-      });
-    }
   }
   for (const [key, geos] of buckets) {
     const [c, m, glow] = key.split('|');
@@ -53,7 +46,7 @@ export function buildWorld(scene, mapId, quality) {
   if (quality.shadows) {
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    const S = 45;
+    const S = 55;
     Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 5, far: 120 });
     sun.shadow.bias = -0.0005;
   }

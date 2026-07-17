@@ -28,25 +28,43 @@ function saveFile(db) {
   } catch (e) { console.error('[store] file save error', e.message); }
 }
 
-// プレイヤー取得(なければ rating=1000 で作成)
+// プレイヤー取得(なければ rating=1000 で作成)。cpuRating = CPU戦専用レート
 export async function getPlayer(deviceId, name) {
   if (supabase) {
     try {
       const { data } = await supabase.from('players').select('*').eq('device_id', deviceId).maybeSingle();
       if (data) {
         if (name && data.name !== name) await supabase.from('players').update({ name }).eq('device_id', deviceId);
-        return { rating: data.rating, games: data.games, wins: data.wins };
+        return { rating: data.rating, cpuRating: data.cpu_rating ?? 1000, games: data.games, wins: data.wins };
       }
-      await supabase.from('players').insert({ device_id: deviceId, name: name || 'プレイヤー', rating: 1000, games: 0, wins: 0 });
-      return { rating: 1000, games: 0, wins: 0 };
+      await supabase.from('players').insert({ device_id: deviceId, name: name || 'プレイヤー', rating: 1000, cpu_rating: 1000, games: 0, wins: 0 });
+      return { rating: 1000, cpuRating: 1000, games: 0, wins: 0 };
     } catch (e) {
       console.error('[store] supabase getPlayer error:', e.message);
-      return { rating: 1000, games: 0, wins: 0 };
+      return { rating: 1000, cpuRating: 1000, games: 0, wins: 0 };
     }
   }
   const db = loadFile();
-  if (!db[deviceId]) { db[deviceId] = { name, rating: 1000, games: 0, wins: 0 }; saveFile(db); }
-  return { rating: db[deviceId].rating, games: db[deviceId].games, wins: db[deviceId].wins };
+  if (!db[deviceId]) { db[deviceId] = { name, rating: 1000, cpuRating: 1000, games: 0, wins: 0 }; saveFile(db); }
+  return { rating: db[deviceId].rating, cpuRating: db[deviceId].cpuRating ?? 1000, games: db[deviceId].games, wins: db[deviceId].wins };
+}
+
+// CPU戦の結果保存 (CPU専用レートのみ更新)
+export async function saveCpuResult(deviceId, name, cpuRating) {
+  if (!deviceId) return;
+  if (supabase) {
+    try {
+      await supabase.from('players').upsert({
+        device_id: deviceId, name, cpu_rating: cpuRating, updated_at: new Date().toISOString()
+      }, { onConflict: 'device_id' });
+      return;
+    } catch (e) { console.error('[store] supabase saveCpuResult error:', e.message); }
+  }
+  const db = loadFile();
+  const p = db[deviceId] || { name, rating: 1000, games: 0, wins: 0 };
+  p.name = name; p.cpuRating = cpuRating;
+  db[deviceId] = p;
+  saveFile(db);
 }
 
 // 試合結果保存: results = [{deviceId, name, rating(新), win, delta}]

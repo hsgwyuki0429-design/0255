@@ -32,3 +32,12 @@ export function computeDeltas(entries) {
   }
   return entries.map((e, i) => ({ id: e.id, delta: deltas[i] }));
 }
+
+// CPU戦専用レート: CPUの強さは常に自分のCPUレートに追従するので
+// 期待勝率≈50%とみなし、勝敗ベース + 活躍ボーナスで増減する。
+// perf = タッチ*1.5 + 救出*2 - つかまり回数
+export function computeCpuDelta(cpuRating, win, perf) {
+  const p = Math.max(-4, Math.min(6, Math.round(perf)));
+  let d = win ? 16 + Math.max(0, p) : -13 + Math.min(0, p);
+  return Math.max(-25, Math.min(28, d));
+}

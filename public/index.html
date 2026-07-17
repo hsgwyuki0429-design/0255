@@ -22,6 +22,7 @@
     <div class="profile-card">
       <input id="inp-name" maxlength="12" placeholder="ニックネーム">
       <div class="rate-badge">レート <b id="my-rating">----</b><span id="my-tier"></span></div>
+      <div class="rate-badge">CPU <b id="my-cpu-rating">----</b><span id="my-cpu-tier"></span></div>
     </div>
     <div class="home-cols">
       <div class="panel">
@@ -40,7 +41,48 @@
         <ol id="ranking" class="ranking"></ol>
       </div>
     </div>
-    <button id="btn-create" class="big-btn">部屋を作る</button>
+    <div class="home-btns">
+      <button id="btn-create" class="big-btn">部屋を作る</button>
+      <button id="btn-cpu" class="big-btn cpu">🤖 CPUと遊ぶ</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CPU戦モーダル ============ -->
+<div id="modal-cpu" class="modal hidden">
+  <div class="modal-box">
+    <h2>🤖 CPUと遊ぶ</h2>
+    <div id="cpu-strength" class="cpu-strength">CPUの強さ: ---</div>
+    <label>ルール
+      <div class="seg" id="cpu-mode">
+        <button data-v="doro" class="on">泥警</button><button data-v="koori">氷鬼</button><button data-v="kawari">代わり鬼</button>
+      </div>
+    </label>
+    <label>マップ
+      <div class="seg" id="cpu-map">
+        <button data-v="school" class="on">学校</button><button data-v="mall">モール</button><button data-v="cave">地下洞窟</button>
+      </div>
+    </label>
+    <label>自分の役割
+      <div class="seg" id="cpu-role">
+        <button data-v="random" class="on">おまかせ</button><button data-v="run">逃げ</button><button data-v="oni">鬼</button>
+      </div>
+    </label>
+    <div class="row2">
+      <label>CPUの数
+        <select id="cpu-count"><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option><option>7</option></select>
+      </label>
+      <label>制限時間
+        <select id="cpu-time">
+          <option value="120">2分</option><option value="180" selected>3分</option>
+          <option value="300">5分</option>
+        </select>
+      </label>
+    </div>
+    <div class="modal-btns">
+      <button id="cpu-cancel" class="ghost">やめる</button>
+      <button id="cpu-ok" class="big-btn">対戦開始!</button>
+    </div>
   </div>
 </div>
 
@@ -99,9 +141,11 @@
       <button id="btn-start" class="big-btn hidden">ゲーム開始!</button>
       <div id="wait-host" class="wait-host">ホストの開始を待っています…</div>
     </div>
-    <div id="countdown-overlay" class="countdown hidden"></div>
   </div>
 </div>
+
+<!-- カウントダウン (ホーム/ロビーどちらからでも表示できるよう最上位に置く) -->
+<div id="countdown-overlay" class="countdown hidden"></div>
 
 <!-- ============ ゲーム画面 ============ -->
 <div id="screen-game" class="screen">
@@ -117,11 +161,13 @@
     <div id="grace-overlay" class="hidden">スタートまで <b id="grace-n">5</b></div>
     <div id="status-overlay" class="hidden"></div>
     <div id="touch-hint" class="hidden">🤝 タッチで助ける!</div>
+    <div id="stamina-wrap"><div id="stamina-bar"></div></div>
   </div>
-  <!-- モバイル操作: 左=仮想スティック / 右下=撃つ / 右のそれ以外タップ=ジャンプ -->
+  <!-- モバイル操作: 左=仮想スティック / 右下=撃つ・ダッシュ / 右のそれ以外タップ=ジャンプ -->
   <div id="stick-zone"><div id="stick-base" class="hidden"><div id="stick-knob"></div></div></div>
   <div id="right-zone"></div>
   <button id="btn-shoot" class="hidden"><span>撃つ</span></button>
+  <button id="btn-dash"><span>🏃</span></button>
   <div id="jump-hint" class="jump-hint">右側タップでジャンプ</div>
 </div>
 

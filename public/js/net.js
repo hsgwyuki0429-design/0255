@@ -12,6 +12,7 @@ export class Net {
   listRooms() { return this.ask('listRooms'); }
   ranking() { return this.ask('ranking'); }
   createRoom(opts) { return this.ask('createRoom', opts); }
+  startCpu(opts) { return this.ask('startCpu', opts); }
   joinRoom(data) { return this.ask('joinRoom', data); }
   leaveRoom() { this.socket.emit('leaveRoom'); }
   setOpts(opts) { this.socket.emit('setOpts', opts); }

@@ -14,6 +14,8 @@ export class Input {
     this.lookLast = { x: 0, y: 0 };
     this.lookMoved = 0;
     this.lookStart = 0;
+    this.lastLookT = 0;      // 最後にスワイプ/ドラッグで視点を動かした時刻
+    this.sprintTouch = false;
     this.enabled = false;
   }
 
@@ -80,6 +82,7 @@ export class Input {
         const dx = t.clientX - this.lookLast.x, dy = t.clientY - this.lookLast.y;
         this.lookMoved += Math.abs(dx) + Math.abs(dy);
         this.lookDX += dx; this.lookDY += dy;
+        if (Math.abs(dx) + Math.abs(dy) > 1) this.lastLookT = performance.now();
         this.lookLast = { x: t.clientX, y: t.clientY };
       }
     }, { passive: false });
@@ -102,6 +105,17 @@ export class Input {
     }, { passive: false });
     shootBtn.addEventListener('mousedown', e => { if (this.enabled) { e.stopPropagation(); this.shootQueued = true; } });
 
+    // ---- ダッシュボタン (モバイル: 押している間ダッシュ) ----
+    const dashBtn = document.getElementById('btn-dash');
+    if (dashBtn) {
+      dashBtn.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); this.sprintTouch = true; }, { passive: false });
+      const dashEnd = e => { e.preventDefault(); this.sprintTouch = false; };
+      dashBtn.addEventListener('touchend', dashEnd, { passive: false });
+      dashBtn.addEventListener('touchcancel', dashEnd, { passive: false });
+      dashBtn.addEventListener('mousedown', e => { e.stopPropagation(); this.sprintTouch = true; });
+      window.addEventListener('mouseup', () => { this.sprintTouch = false; });
+    }
+
     // ---- PC: キーボード + マウス ----
     window.addEventListener('keydown', e => {
       this.keys[e.code] = true;
@@ -117,8 +131,10 @@ export class Input {
     });
     window.addEventListener('mousemove', e => {
       if (!mouseDown || !this.enabled) return;
-      this.lookDX += e.clientX - lastM.x;
-      this.lookDY += e.clientY - lastM.y;
+      const dx = e.clientX - lastM.x, dy = e.clientY - lastM.y;
+      this.lookDX += dx;
+      this.lookDY += dy;
+      if (Math.abs(dx) + Math.abs(dy) > 1) this.lastLookT = performance.now();
       lastM = { x: e.clientX, y: e.clientY };
     });
     window.addEventListener('mouseup', e => {
@@ -148,5 +164,6 @@ export class Input {
     return r;
   }
   consumeJump() { const j = this.jumpQueued; this.jumpQueued = false; return j; }
+  getSprint() { return !!(this.sprintTouch || this.keys['ShiftLeft'] || this.keys['ShiftRight']); }
   consumeShoot() { const s = this.shootQueued; this.shootQueued = false; return s; }
 }
