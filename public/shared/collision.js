@@ -1,9 +1,11 @@
-// カプセル(円柱近似) vs AABB の移動・衝突解決
+// カプセル(円柱近似) vs AABB の移動・衝突解決 (クライアント/サーバー共用)
 // 階段は「段差0.34mまで自動でせり上がる」ステップアップ方式
+// bounce付きAABBの上に落ちると跳ね上がる (トランポリン)
 const R = 0.32;        // 半径
 const H = 1.66;        // 身長
 const STEP = 0.34;     // 乗り越えられる段差
 const EPS = 0.001;
+const BOUNCE_V = 9.2;  // トランポリンの跳ね上げ速度
 
 function overlaps(px, py, pz, s) {
   return px + R > s.minX && px - R < s.maxX &&
@@ -12,9 +14,9 @@ function overlaps(px, py, pz, s) {
 }
 
 // 位置pos{x,y,z}, 速度vel{x,y,z} を dt 進める。solids は AABB配列。
-// 戻り値: {onGround, hitWall}
+// 戻り値: {onGround, hitWall, bounced}
 export function moveCapsule(pos, vel, dt, solids) {
-  let onGround = false, hitWall = false;
+  let onGround = false, hitWall = false, bounced = false;
   // 近傍だけに絞る
   const near = [];
   for (const s of solids) {
@@ -56,7 +58,11 @@ export function moveCapsule(pos, vel, dt, solids) {
   for (const s of near) {
     if (!overlaps(pos.x, ny, pos.z, s)) continue;
     if (vel.y <= 0 && pos.y >= s.maxY - 0.35) {       // 落下 → 上面に着地
-      ny = s.maxY; vel.y = 0; onGround = true;
+      if (s.bounce && vel.y < -2.5) {                  // トランポリン: 勢いよく着地で跳ね上げ
+        ny = s.maxY; vel.y = BOUNCE_V; bounced = true;
+      } else {
+        ny = s.maxY; vel.y = 0; onGround = true;
+      }
     } else if (vel.y > 0 && pos.y + H <= s.minY + 0.35) { // 上昇 → 底面に頭ぶつけ
       ny = s.minY - H - EPS; vel.y = 0;
     }
@@ -70,7 +76,7 @@ export function moveCapsule(pos, vel, dt, solids) {
           Math.abs(pos.y - s.maxY) < 0.02) { onGround = true; break; }
     }
   }
-  return { onGround, hitWall };
+  return { onGround, hitWall, bounced };
 }
 
 function canStand(x, y, z, solids, ignore) {

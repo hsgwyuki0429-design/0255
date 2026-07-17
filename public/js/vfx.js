@@ -20,6 +20,9 @@ export class VFX {
     for (let i = 0; i < MAX; i++) this.parts.push({ life: 0, ttl: 1, p: new THREE.Vector3(), v: new THREE.Vector3(), c: new THREE.Color(), grav: 0 });
     this.tracers = [];
     this.rings = [];
+    this.bullets = [];
+    // 弾のジオメトリ/マテリアルは共有
+    this.bulletGeo = new THREE.SphereGeometry(0.07, 8, 8);
   }
 
   spawn(pos, color, n, speed, ttl = 0.6, grav = -4, spread = 1) {
@@ -52,6 +55,22 @@ export class VFX {
     this.spawn(from, color, 6, 1.5, 0.15, 0, 2.5);
   }
 
+  // 飛翔するペイント弾: 光る球が射線に沿って飛ぶ
+  bullet(origin, dir, color = 0xffee55, range = 1.9) {
+    const speed = 13;
+    const mesh = new THREE.Mesh(this.bulletGeo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1 }));
+    mesh.position.set(...origin);
+    this.scene.add(mesh);
+    this.bullets.push({
+      mesh,
+      v: new THREE.Vector3(...dir).multiplyScalar(speed),
+      life: range / speed, ttl: range / speed, color
+    });
+  }
+
+  // ペイントが弾ける飛沫
+  paintBurst(pos, color) { this.spawn(pos, color, 26, 3.2, 0.65, -5, 2.2); }
+
   // 捕獲/救出のリング波
   ring(pos, color = 0xff4444) {
     const mesh = new THREE.Mesh(
@@ -82,6 +101,17 @@ export class VFX {
     this.points.geometry.attributes.position.needsUpdate = true;
     this.points.geometry.attributes.color.needsUpdate = true;
 
+    for (let j = this.bullets.length - 1; j >= 0; j--) {
+      const b = this.bullets[j];
+      b.life -= dt;
+      b.mesh.position.addScaledVector(b.v, dt);
+      if (b.life <= 0) {
+        // 射程の終端で小さくインクが散る
+        this.spawn(b.mesh.position, b.color, 6, 1.8, 0.3, -4, 2);
+        this.scene.remove(b.mesh); b.mesh.material.dispose();
+        this.bullets.splice(j, 1);
+      }
+    }
     for (let j = this.tracers.length - 1; j >= 0; j--) {
       const t = this.tracers[j];
       t.life -= dt;

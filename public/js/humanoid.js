@@ -1,17 +1,30 @@
 // ============================================================
 // 関節付き人型キャラクター + 手続きアニメーション
+// カプセル・球ベースの丸みのある体型。骨盤と脚は関節球で連結し
+// 腰まわりの隙間が出ないように各パーツをオーバーラップさせている。
 // 歩行/走行サイクル・腕振り+肘曲げ・膝上げ・骨盤の上下/左右動・
-// 体幹のひねり・前傾・ジャンプ予備動作・空中姿勢・着地衝撃・
-// 射撃構え・凍結/捕縛ポーズ・呼吸・首の向き まで表現する
+// 体幹のひねり・前傾・空中姿勢・着地衝撃・射撃構え・凍結/捕縛ポーズ・
+// 呼吸・首の向き・ペイント弾の被弾痕 まで表現する
 // ============================================================
 import * as THREE from 'three';
 
 const SKIN = 0xf0c8a0;
 export const BODY_COLORS = [0x4488ee, 0x44cc77, 0xeeaa33, 0xaa66ee, 0x66ccdd, 0xee6699, 0x99bb44, 0xdd8855, 0x8899aa, 0xcc5555];
 
-function box(w, h, d, color, py = 0) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color, roughness: 0.75 }));
+function mat(color) { return new THREE.MeshStandardMaterial({ color, roughness: 0.72 }); }
+
+// 丸い縦長パーツ (カプセル)。py = 中心のy位置
+function capsule(r, len, color, py = 0) {
+  const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 3, 10), mat(color));
   m.position.y = py;
+  m.castShadow = true;
+  return m;
+}
+// 球パーツ (sx,sy,sz でつぶして丸みを調整)
+function ball(r, color, py = 0, sx = 1, sy = 1, sz = 1) {
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), mat(color));
+  m.position.y = py;
+  m.scale.set(sx, sy, sz);
   m.castShadow = true;
   return m;
 }
@@ -20,53 +33,62 @@ export class Humanoid {
   constructor(colorIdx = 0, name = '') {
     const c = BODY_COLORS[colorIdx % BODY_COLORS.length];
     const dark = new THREE.Color(c).multiplyScalar(0.55).getHex();
+    const mid = new THREE.Color(c).multiplyScalar(0.8).getHex();
     this.color = c;
     this.root = new THREE.Group();          // 地面基準
     this.body = new THREE.Group();          // 上下動用
     this.root.add(this.body);
 
-    // ---- 骨盤・胴体・頭 ----
+    // ---- 骨盤・胴体・頭 (骨盤球→腹球→胸カプセルが重なり合い、隙間なく繋がる) ----
     this.pelvis = new THREE.Group(); this.pelvis.position.y = 0.94; this.body.add(this.pelvis);
-    this.pelvis.add(box(0.34, 0.16, 0.2, dark, -0.02));
+    this.pelvis.add(ball(0.155, dark, -0.02, 1.25, 0.8, 1.0));            // 腰 (丸いヒップ)
     this.spine = new THREE.Group(); this.spine.position.y = 0.06; this.pelvis.add(this.spine);
+    this.spine.add(ball(0.14, mid, 0.05, 1.2, 0.9, 0.92));                // 腹 (骨盤と胸を繋ぐ)
     this.chestG = new THREE.Group(); this.chestG.position.y = 0.18; this.spine.add(this.chestG);
-    this.chestG.add(box(0.38, 0.4, 0.22, c, 0.16));
+    this.chestG.add(capsule(0.155, 0.17, c, 0.16));                       // 胸
+    this.chestG.children[0].scale.set(1.18, 1, 0.88);
     this.neck = new THREE.Group(); this.neck.position.y = 0.4; this.chestG.add(this.neck);
-    const head = box(0.24, 0.26, 0.24, SKIN, 0.15); this.neck.add(head);
-    const hair = box(0.26, 0.1, 0.26, dark, 0.29); this.neck.add(hair);
-    // 目 (前向きの目印)
+    this.neck.add(capsule(0.05, 0.06, SKIN, 0.02));                       // 首
+    this.neck.add(ball(0.148, SKIN, 0.16, 1, 1.05, 1));                   // 頭 (丸)
+    this.neck.add(ball(0.152, dark, 0.2, 1, 0.82, 1));                    // 髪
     const eyeM = new THREE.MeshBasicMaterial({ color: 0x222222 });
     for (const s of [-1, 1]) {
-      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.05, 0.02), eyeM);
-      eye.position.set(s * 0.06, 0.16, 0.125); this.neck.add(eye);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), eyeM);
+      eye.scale.set(1, 1.5, 0.6);
+      eye.position.set(s * 0.058, 0.155, 0.135); this.neck.add(eye);
     }
 
-    // ---- 腕 (肩ピボット → 上腕 → 肘ピボット → 前腕 → 手) ----
+    // ---- 腕 (肩球 → 上腕 → 肘球 → 前腕 → 手球) ----
     this.arms = {};
     for (const s of [-1, 1]) {
       const shoulder = new THREE.Group();
-      shoulder.position.set(s * 0.245, 0.33, 0); this.chestG.add(shoulder);
-      const upper = box(0.11, 0.3, 0.11, c, -0.15); shoulder.add(upper);
+      shoulder.position.set(s * 0.225, 0.33, 0); this.chestG.add(shoulder);
+      shoulder.add(ball(0.075, c, 0));                                    // 肩の丸み
+      shoulder.add(capsule(0.055, 0.16, c, -0.15));                       // 上腕
       const elbow = new THREE.Group(); elbow.position.y = -0.3; shoulder.add(elbow);
-      const fore = box(0.09, 0.26, 0.09, SKIN, -0.13); elbow.add(fore);
-      const hand = box(0.1, 0.09, 0.1, SKIN, -0.3); elbow.add(hand);
+      elbow.add(ball(0.052, c, 0));                                       // 肘
+      elbow.add(capsule(0.046, 0.14, SKIN, -0.13));                       // 前腕
+      elbow.add(ball(0.06, SKIN, -0.29, 1, 0.9, 1));                      // 手
       this.arms[s] = { shoulder, elbow };
     }
-    // ---- 脚 (股関節 → 大腿 → 膝 → 下腿 → 足) ----
+    // ---- 脚 (股関節球 → 大腿 → 膝球 → 下腿 → 足) : 股関節球が骨盤に埋まり腰と連結 ----
     this.legs = {};
     for (const s of [-1, 1]) {
       const hip = new THREE.Group(); hip.position.set(s * 0.1, -0.06, 0); this.pelvis.add(hip);
-      const thigh = box(0.13, 0.4, 0.14, dark, -0.2); hip.add(thigh);
+      hip.add(ball(0.095, dark, 0));                                      // 股関節 (骨盤と重なる)
+      hip.add(capsule(0.075, 0.22, dark, -0.2));                          // 大腿
       const knee = new THREE.Group(); knee.position.y = -0.42; hip.add(knee);
-      const shin = box(0.11, 0.38, 0.12, dark, -0.19); knee.add(shin);
-      const foot = box(0.12, 0.08, 0.24, 0x333344, -0.42); foot.position.z = 0.04; knee.add(foot);
+      knee.add(ball(0.068, dark, 0));                                     // 膝
+      knee.add(capsule(0.06, 0.2, dark, -0.19));                          // 下腿
+      const foot = ball(0.085, 0x333344, -0.42, 1.1, 0.62, 1.9); foot.position.z = 0.05; knee.add(foot);
       this.legs[s] = { hip, knee };
     }
 
     // ---- 銃 (鬼のときだけ表示) ----
     this.gun = new THREE.Group();
-    const gunBody = box(0.06, 0.09, 0.26, 0x333340); gunBody.position.z = 0.1;
-    const gunGrip = box(0.05, 0.12, 0.06, 0x554433, -0.08);
+    const gunBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.2, 3, 8), mat(0x333340));
+    gunBody.rotation.x = Math.PI / 2; gunBody.position.z = 0.12;
+    const gunGrip = capsule(0.028, 0.07, 0x554433, -0.07);
     this.gun.add(gunBody, gunGrip);
     this.gun.position.set(0, -0.3, 0.05);
     this.gun.visible = false;
@@ -74,7 +96,7 @@ export class Humanoid {
 
     // ---- 鬼マーカー (頭上の角) と役割リング ----
     this.horn = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0xff3333, emissive: 0x881111 }));
-    this.horn.position.y = 0.36; this.horn.visible = false; this.neck.add(this.horn);
+    this.horn.position.y = 0.37; this.horn.visible = false; this.neck.add(this.horn);
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.34, 0.46, 24), new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
     this.ring.rotation.x = -Math.PI / 2; this.ring.position.y = 0.03; this.ring.visible = false;
     this.root.add(this.ring);
@@ -94,6 +116,7 @@ export class Humanoid {
     this.smoothedSpeed = 0;
     this.wasGround = true;
     this.leanF = 0; this.leanS = 0;
+    this.paints = [];     // 被弾ペイント
   }
 
   setName(name) {
@@ -120,6 +143,39 @@ export class Humanoid {
   setFrozen(f) { this.ice.visible = f; }
 
   triggerShoot() { this.shootT = 0; }
+
+  // ペイント弾の被弾痕: 体にインクの飛沫を貼り付ける
+  addPaint(color) {
+    if (this.paints.length >= 10) {
+      const old = this.paints.shift();
+      old.parent?.remove(old);
+      old.geometry.dispose(); old.material.dispose();
+    }
+    const front = Math.random() < 0.5 ? 1 : -1;
+    const onChest = Math.random() < 0.65;
+    const parent = onChest ? this.chestG : this.pelvis;
+    const splat = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055 + Math.random() * 0.045, 10, 8),
+      new THREE.MeshStandardMaterial({ color, roughness: 0.35, emissive: color, emissiveIntensity: 0.25 })
+    );
+    splat.scale.set(1, 0.85 + Math.random() * 0.4, 0.32); // 平たい飛沫
+    splat.position.set(
+      (Math.random() - 0.5) * 0.22,
+      onChest ? 0.04 + Math.random() * 0.26 : -0.05 + Math.random() * 0.1,
+      front * (onChest ? 0.145 : 0.13)
+    );
+    splat.rotation.z = Math.random() * Math.PI;
+    parent.add(splat);
+    this.paints.push(splat);
+    // 小さな飛び散り
+    for (let i = 0; i < 2; i++) {
+      const drop = new THREE.Mesh(new THREE.SphereGeometry(0.02 + Math.random() * 0.015, 6, 6), splat.material);
+      drop.scale.set(1, 1, 0.4);
+      drop.position.copy(splat.position).add(new THREE.Vector3((Math.random() - 0.5) * 0.16, (Math.random() - 0.5) * 0.16, 0));
+      parent.add(drop);
+      this.paints.push(drop);
+    }
+  }
 
   // state: {speed(m/s), velY, onGround, moving, aiming, frozen, jailed, dt}
   update(st) {

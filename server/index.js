@@ -8,9 +8,11 @@ import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
-import { MAPS } from '../public/shared/mapdata.js';
-import { getPlayer, saveResults, topPlayers } from './store.js';
-import { computeDeltas } from './rating.js';
+import { MAPS, solidsOf } from '../public/shared/mapdata.js';
+import { getPlayer, saveResults, saveCpuResult, topPlayers } from './store.js';
+import { computeDeltas, computeCpuDelta } from './rating.js';
+import { NavGrid } from './nav.js';
+import { BotBrain, cpuLevelOf, CPU_LEVEL_NAMES, botName } from './bots.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -33,7 +35,30 @@ const GRACE_MS = 5000;       // 開始時に鬼が動けない猶予
 const SWAP_IMMUNE_MS = 3000; // 代わり鬼: タッチバック禁止時間
 
 // ---------------- プレイヤー ----------------
-const players = new Map(); // socket.id -> {socket, name, deviceId, rating, games, wins, roomId}
+const players = new Map(); // socket.id -> {socket, name, deviceId, rating, cpuRating, games, wins, roomId}
+
+// ---------------- CPUボット用ナビゲーション (マップごとに遅延構築) ----------------
+const navCache = new Map();
+function navOf(mapId) {
+  if (!navCache.has(mapId)) {
+    const map = MAPS[mapId];
+    const solids = solidsOf(map);
+    const t0 = Date.now();
+    const nav = new NavGrid(map, solids);
+    console.log(`[nav] ${mapId}: グリッド構築 ${Date.now() - t0}ms`);
+    navCache.set(mapId, { nav, solids });
+  }
+  return navCache.get(mapId);
+}
+let botSeq = 1;
+function makeBot(i, rating) {
+  const id = 'bot_' + (botSeq++);
+  return {
+    id, name: botName(i), deviceId: null, isBot: true,
+    rating, games: 0, wins: 0, roomId: null,
+    socket: { join() {}, leave() {}, emit() {} }
+  };
+}
 
 // ---------------- 部屋 ----------------
 const rooms = new Map();
@@ -44,7 +69,7 @@ function roomSummary(r) {
     id: r.id, name: r.name, mode: r.mode, modeName: MODES[r.mode], mapId: r.mapId,
     mapName: MAPS[r.mapId].name, oniCount: r.oniCount, timeLimit: r.timeLimit,
     isPublic: r.isPublic, locked: !r.isPublic, count: r.members.size, max: MAX_PLAYERS,
-    state: r.state
+    state: r.state, isCpu: !!r.isCpu
   };
 }
 function lobbyState(r) {
@@ -75,7 +100,7 @@ class Room {
     this.timers = [];
   }
   addTimer(fn, ms) { const t = setTimeout(fn, ms); this.timers.push(t); return t; }
-  clearTimers() { this.timers.forEach(clearTimeout); this.timers = []; if (this.tickIv) clearInterval(this.tickIv); if (this.snapIv) clearInterval(this.snapIv); }
+  clearTimers() { this.timers.forEach(clearTimeout); this.timers = []; if (this.tickIv) clearInterval(this.tickIv); if (this.snapIv) clearInterval(this.snapIv); if (this.botIv) clearInterval(this.botIv); }
 
   join(p) {
     this.members.set(p.id, p);
@@ -88,6 +113,13 @@ class Room {
     this.members.delete(p.id);
     p.roomId = null;
     p.socket.leave(this.id);
+    // CPU部屋: 人間が全員いなくなったら即解散
+    if (this.isCpu && ![...this.members.values()].some(m => !m.isBot)) {
+      this.clearTimers();
+      rooms.delete(this.id);
+      broadcastRooms();
+      return;
+    }
     if (this.game) this.onLeaveDuringGame(p);
     if (this.members.size === 0) {
       this.clearTimers();
@@ -119,9 +151,15 @@ class Room {
   launch() {
     const map = MAPS[this.mapId];
     const ids = [...this.members.keys()];
-    // 鬼をランダム選出 (人数-1 を上限)
+    // 鬼をランダム選出 (人数-1 を上限)。CPU戦では人間の役割希望を反映する
     const oniN = Math.min(this.oniCount, ids.length - 1);
-    const shuffled = [...ids].sort(() => Math.random() - 0.5);
+    let shuffled = [...ids].sort(() => Math.random() - 0.5);
+    if (this.forceRole === 'oni' || this.forceRole === 'run') {
+      const humans = ids.filter(id => !this.members.get(id).isBot);
+      shuffled = shuffled.filter(id => !humans.includes(id));
+      if (this.forceRole === 'oni') shuffled = [...humans, ...shuffled];
+      else shuffled = [...shuffled, ...humans];
+    }
     const oniIds = new Set(shuffled.slice(0, oniN));
 
     const g = this.game = {
@@ -153,6 +191,21 @@ class Room {
           id: p.id, name: this.members.get(p.id).name, role: p.role, pos: p.pos, rating: this.members.get(p.id).rating
         }))
       });
+    }
+    // CPU戦: ボットの頭脳を起動 (20Hz)
+    if (this.isCpu) {
+      const { nav, solids } = navOf(this.mapId);
+      this.brains = [];
+      for (const [id, m] of this.members) {
+        if (m.isBot && g.players.has(id)) this.brains.push(new BotBrain(id, this, this.cpuLevel, nav, solids, map));
+      }
+      this.botIv = setInterval(() => {
+        const now = Date.now();
+        if (!this.game || this.game.over) return;
+        for (const b of this.brains) {
+          try { b.update(0.05, now); } catch (e) { /* ボット1体の例外でゲームを止めない */ }
+        }
+      }, 50);
     }
     // スナップショット配信 (15Hz) とルール監視 (2Hz)
     this.snapIv = setInterval(() => {
@@ -283,6 +336,7 @@ class Room {
 
   // ---------- 終了とレート ----------
   async finish(reason) {
+    if (this.isCpu) return this.finishCpu(reason);
     const g = this.game; if (!g || g.over) return;
     g.over = true;
     this.clearTimers();
@@ -333,6 +387,57 @@ class Room {
     this.state = 'lobby';
     this.addTimer(() => { io.to(this.id).emit('roomUpdate', lobbyState(this)); broadcastRooms(); }, 100);
   }
+
+  // ---------- CPU戦の終了: 人間のCPU専用レートだけを増減させる ----------
+  async finishCpu(reason) {
+    const g = this.game; if (!g || g.over) return;
+    g.over = true;
+    this.clearTimers();
+    const now = Date.now();
+    const total = Math.max(1, now - g.startAt);
+    let winner;
+    if (this.mode === 'kawari') {
+      for (const p of g.players.values()) if (p.role === 'oni') p.stats.oniTime += now - p.stats.lastBecameOni;
+      winner = 'run';
+    } else {
+      winner = (reason === 'allCaught') ? 'oni' : 'run';
+    }
+    const results = [];
+    const cpuSaves = [];
+    for (const [id, p] of g.players) {
+      const m = this.members.get(id); if (!m) continue;
+      let win;
+      if (this.mode === 'kawari') win = p.role !== 'oni';
+      else win = (p.role === 'oni') === (winner === 'oni');
+      let delta = 0, rating = m.rating;
+      if (!m.isBot) {
+        const perf = p.stats.tags * 1.5 + p.stats.rescues * 2 - p.stats.caughtCount;
+        delta = computeCpuDelta(m.cpuRating, win, perf);
+        m.cpuRating = Math.max(0, m.cpuRating + delta);
+        rating = m.cpuRating;
+        cpuSaves.push(m);
+      }
+      results.push({
+        id, name: m.name, role: p.role, win, delta, rating, isBot: !!m.isBot,
+        tags: p.stats.tags, rescues: p.stats.rescues, caught: p.stats.caughtCount,
+        oniTime: Math.round(p.stats.oniTime / 1000)
+      });
+    }
+    results.sort((a, b) => (b.win - a.win) || (b.delta - a.delta));
+    io.to(this.id).emit('gameEnd', { winner, reason, mode: this.mode, isCpu: true, cpuLevel: this.cpuLevel, results });
+    for (const m of cpuSaves) saveCpuResult(m.deviceId, m.name, m.cpuRating).catch(() => {});
+    this.game = null;
+    this.state = 'ended';
+    // 少し待ってから解散 (クライアントは結果画面からホームへ戻る)
+    this.addTimer(() => {
+      for (const m of [...this.members.values()]) {
+        if (!m.isBot) { m.roomId = null; m.socket.leave(this.id); }
+      }
+      this.members.clear();
+      rooms.delete(this.id);
+      broadcastRooms();
+    }, 500);
+  }
 }
 
 // ---------------- ソケット ----------------
@@ -344,9 +449,9 @@ io.on('connection', (socket) => {
       const name = String(data?.name || 'プレイヤー').slice(0, 12).trim() || 'プレイヤー';
       const deviceId = String(data?.deviceId || socket.id).slice(0, 64);
       const rec = await getPlayer(deviceId, name);
-      me = { id: socket.id, socket, name, deviceId, rating: rec.rating, games: rec.games, wins: rec.wins, roomId: null };
+      me = { id: socket.id, socket, name, deviceId, rating: rec.rating, cpuRating: rec.cpuRating, games: rec.games, wins: rec.wins, roomId: null };
       players.set(socket.id, me);
-      cb?.({ ok: true, id: socket.id, name, rating: rec.rating, games: rec.games, wins: rec.wins });
+      cb?.({ ok: true, id: socket.id, name, rating: rec.rating, cpuRating: rec.cpuRating, games: rec.games, wins: rec.wins });
     } catch (e) { cb?.({ ok: false, error: 'サーバーエラー' }); }
   });
 
@@ -360,6 +465,34 @@ io.on('connection', (socket) => {
     rooms.set(r.id, r);
     r.join(me);
     cb?.({ ok: true, room: lobbyState(r) });
+  });
+
+  // ---- CPU戦: 部屋作成→ボット追加→即開始 (ロビーなし) ----
+  socket.on('startCpu', (opts, cb) => {
+    if (!me) return cb?.({ ok: false, error: '未接続' });
+    if (me.roomId) return cb?.({ ok: false, error: 'すでに部屋にいます' });
+    const o = opts || {};
+    const r = new Room({
+      name: `${me.name}のCPU戦`, mode: o.mode, mapId: o.mapId,
+      oniCount: o.oniCount, timeLimit: o.timeLimit, isPublic: false, password: ''
+    }, me);
+    r.isCpu = true;
+    r.cpuLevel = cpuLevelOf(me.cpuRating);
+    r.forceRole = (o.myRole === 'oni' || o.myRole === 'run') ? o.myRole : null;
+    rooms.set(r.id, r);
+    r.join(me);
+    const n = Math.max(2, Math.min(7, o.cpuCount | 0 || 3));
+    for (let i = 0; i < n; i++) {
+      const bot = makeBot(i, Math.max(0, me.cpuRating + ((Math.random() * 60) | 0) - 30));
+      bot.roomId = r.id;
+      r.members.set(bot.id, bot);
+    }
+    if (!r.start()) {
+      rooms.delete(r.id);
+      me.roomId = null;
+      return cb?.({ ok: false, error: '開始できませんでした' });
+    }
+    cb?.({ ok: true, cpuLevel: r.cpuLevel, cpuLevelName: CPU_LEVEL_NAMES[r.cpuLevel] });
   });
 
   socket.on('joinRoom', (data, cb) => {

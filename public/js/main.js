@@ -7,7 +7,7 @@ import { Net } from './net.js';
 import { Input } from './input.js';
 import { Humanoid } from './humanoid.js';
 import { buildWorld, clampCamera } from './world.js';
-import { moveCapsule } from './collision.js';
+import { moveCapsule } from '/shared/collision.js';
 import { Minimap } from './minimap.js';
 import { VFX } from './vfx.js';
 import { initAudio, SFX } from './sfx.js';
@@ -18,7 +18,7 @@ const net = new Net();
 const input = new Input();
 input.attach();
 
-let me = { id: null, name: '', rating: 1000 };
+let me = { id: null, name: '', rating: 1000, cpuRating: 1000 };
 let currentRoom = null;
 let game = null;   // ゲーム中の全状態
 
@@ -27,6 +27,13 @@ localStorage.setItem('oni-device', deviceId);
 
 const TIERS = [[1400, '🌋 マグマ'], [1250, '💎 ダイヤ'], [1100, '🥇 ゴールド'], [1000, '🥈 シルバー'], [0, '🥉 ブロンズ']];
 function tierOf(r) { return TIERS.find(([m]) => r >= m)[1]; }
+// CPU戦: レート帯 → CPUの賢さ (サーバー側 bots.js と対応)
+const CPU_LEVELS = [[1400, '👺 鬼神'], [1250, '🧠 鬼軍師'], [1100, '📚 かしこい鬼'], [1000, '🎯 しっかり鬼'], [900, '👹 ふつうの鬼'], [0, '🐣 みならい鬼']];
+function cpuLevelNameOf(r) { return CPU_LEVELS.find(([m]) => r >= m)[1]; }
+function updateCpuBadge() {
+  $('my-cpu-rating').textContent = me.cpuRating;
+  $('my-cpu-tier').textContent = cpuLevelNameOf(me.cpuRating);
+}
 
 function show(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -47,9 +54,10 @@ async function connect() {
   localStorage.setItem('oni-name', name);
   const res = await net.hello(name, deviceId);
   if (res?.ok) {
-    me = { id: res.id, name: res.name, rating: res.rating };
+    me = { id: res.id, name: res.name, rating: res.rating, cpuRating: res.cpuRating ?? 1000 };
     $('my-rating').textContent = res.rating;
     $('my-tier').textContent = tierOf(res.rating);
+    updateCpuBadge();
   }
 }
 
@@ -114,6 +122,28 @@ $('c-ok').onclick = async () => {
   if (res.ok) { $('modal-create').classList.add('hidden'); enterLobby(res.room); }
   else toast(res.error);
 };
+// ---------------- CPU戦 ----------------
+const cpuState = { mode: 'doro', mapId: 'school', myRole: 'random' };
+segInit('cpu-mode', v => cpuState.mode = v);
+segInit('cpu-map', v => cpuState.mapId = v);
+segInit('cpu-role', v => cpuState.myRole = v);
+$('btn-cpu').onclick = () => {
+  initAudio();
+  $('cpu-strength').innerHTML = `CPUの強さ: <b>${cpuLevelNameOf(me.cpuRating)}</b> (CPUレート ${me.cpuRating})<br><small>勝つとCPUレートが上がり、CPUの思考が賢くなる</small>`;
+  $('modal-cpu').classList.remove('hidden');
+};
+$('cpu-cancel').onclick = () => $('modal-cpu').classList.add('hidden');
+$('cpu-ok').onclick = async () => {
+  const cpuCount = +$('cpu-count').value;
+  const res = await net.startCpu({
+    mode: cpuState.mode, mapId: cpuState.mapId, myRole: cpuState.myRole,
+    cpuCount, timeLimit: +$('cpu-time').value,
+    oniCount: Math.max(1, Math.round((cpuCount + 1) / 3))
+  });
+  if (res.ok) { $('modal-cpu').classList.add('hidden'); currentRoom = null; }
+  else toast(res.error || '開始できませんでした');
+};
+
 $('btn-join-private').onclick = async () => {
   initAudio();
   const pw = $('inp-password-join').value.trim();
@@ -158,6 +188,7 @@ $('btn-leave').onclick = () => { net.leaveRoom(); currentRoom = null; show('scre
 $('btn-start').onclick = () => { initAudio(); net.startGame(); };
 
 net.on('roomUpdate', room => {
+  if (room.isCpu) return; // CPU戦はロビーを使わない
   if ($('screen-lobby').classList.contains('active') || $('screen-result').classList.contains('active')) renderLobby(room);
   else currentRoom = room;
 });
@@ -234,7 +265,9 @@ function startGame(data) {
     endsAt: Date.now() + data.timeLimit * 1000,
     graceUntil: Date.now() + Math.max(0, data.graceUntil - (data.endsAt - data.timeLimit * 1000)),
     lastSend: 0, lastTouch: 0, lastShot: 0, stepAcc: 0, stepAlt: false,
-    over: false, aiming: false
+    over: false, aiming: false,
+    stamina: 100, stamLock: false,      // ダッシュ用スタミナ
+    camEyeY: data.you.pos[1]            // カメラ高さは階段でガタつかないよう平滑化
   };
   game.camYaw = game.yaw - Math.PI;
   meR.hum.root.position.copy(game.pos);
@@ -257,7 +290,8 @@ function updateRoleHUD() {
   if (game.role === 'oni') { el.textContent = '👹 鬼'; el.className = 'hud-role'; }
   else { el.textContent = '🏃 逃げ'; el.className = 'hud-role run'; }
   $('btn-shoot').classList.toggle('hidden', game.role !== 'oni');
-  $('jump-hint').style.display = input.isTouch ? '' : 'none';
+  $('jump-hint').textContent = input.isTouch ? '右側タップでジャンプ' : 'Space=ジャンプ / Shift=ダッシュ';
+  $('btn-dash').style.display = input.isTouch ? '' : 'none';
 }
 function updateCountHUD() {
   if (!game) return;
@@ -298,16 +332,28 @@ net.on('timeSync', ({ remain }) => {
 net.on('ev', ev => {
   if (!game && ev.type !== 'joined' && ev.type !== 'left' && ev.type !== 'chat') return;
   const r = ev.id ? game?.remotes.get(ev.id) : null;
+  // ペイント弾が当たった相手の体にインクの痕を付ける
+  const paintOn = (target, shooterId) => {
+    if (!target) return;
+    const sh = shooterId ? game.remotes.get(shooterId) : null;
+    const ink = sh ? sh.hum.color : 0xff4444;
+    target.hum.addPaint(ink);
+    vfx.paintBurst(target.hum.root.position.clone().add(new THREE.Vector3(0, 1.1, 0)), ink);
+    SFX.hit();
+  };
   switch (ev.type) {
     case 'shot': {
       SFX.shoot();
-      vfx.tracer(ev.p, ev.d);
       const shooter = game.remotes.get(ev.id);
+      const ink = shooter ? shooter.hum.color : 0xffee55;
+      vfx.tracer(ev.p, ev.d, ink);
+      vfx.bullet(ev.p, ev.d, ink);           // 弾を描画 (ペイント弾)
       if (shooter) shooter.hum.triggerShoot();
       break;
     }
     case 'jailed': {
       SFX.jailed();
+      paintOn(r, ev.by);
       if (r) {
         r.jailed = true;
         vfx.burst(r.hum.root.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xff4444);
@@ -335,6 +381,7 @@ net.on('ev', ev => {
     }
     case 'frozen': {
       SFX.frozen();
+      paintOn(r, ev.by);
       if (r) { r.frozen = true; r.hum.setFrozen(true); vfx.sparkle(r.hum.root.position.clone().add(new THREE.Vector3(0, 1, 0)), 0x88ccff); }
       if (ev.id === game.meId) {
         game.frozen = true; game.vel.set(0, 0, 0);
@@ -354,6 +401,7 @@ net.on('ev', ev => {
     }
     case 'swapped': {
       SFX.swapped();
+      if (ev.newRun) paintOn(game.remotes.get(ev.newOni), ev.newRun); // 撃った側のインクが付く
       const no = game.remotes.get(ev.newOni), nr = ev.newRun ? game.remotes.get(ev.newRun) : null;
       if (no) { no.role = 'oni'; no.hum.setRole('oni'); vfx.burst(no.hum.root.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xff4444); }
       if (nr) { nr.role = 'run'; nr.hum.setRole('run'); }
@@ -379,7 +427,7 @@ function showStatusFlash(text) {
 }
 
 // ---------------- 結果 ----------------
-net.on('gameEnd', ({ winner, mode, results }) => {
+net.on('gameEnd', ({ winner, mode, isCpu, results }) => {
   if (!game) return;
   input.enabled = false;
   const meRes = results.find(r => r.id === game.meId);
@@ -389,7 +437,7 @@ net.on('gameEnd', ({ winner, mode, results }) => {
 
   $('result-title').textContent = iWon ? '🎉 勝利!' : '😭 敗北…';
   const wname = winner === 'oni' ? '👹 鬼チームの勝ち!' : '🏃 逃げチームの勝ち!';
-  $('result-winner').textContent = mode === 'kawari' ? '⏱ タイムアップ!' : wname;
+  $('result-winner').innerHTML = esc(mode === 'kawari' ? '⏱ タイムアップ!' : wname) + (isCpu ? ' <span class="nowrap">〔CPU戦〕</span>' : '');
   $('result-list').innerHTML = results.map(r => {
     const stats = mode === 'kawari'
       ? `タッチ${r.tags} / 鬼時間${r.oniTime}秒`
@@ -401,10 +449,16 @@ net.on('gameEnd', ({ winner, mode, results }) => {
       <span class="newrate">${r.rating}</span></div>`;
   }).join('');
   if (meRes) {
-    me.rating = meRes.rating;
-    $('my-rating').textContent = me.rating;
-    $('my-tier').textContent = tierOf(me.rating);
+    if (isCpu) {
+      me.cpuRating = meRes.rating; // CPU戦は専用レートのみ変動
+      updateCpuBadge();
+    } else {
+      me.rating = meRes.rating;
+      $('my-rating').textContent = me.rating;
+      $('my-tier').textContent = tierOf(me.rating);
+    }
   }
+  if (isCpu) currentRoom = null; // CPU部屋はサーバー側で解散される
   setTimeout(() => {
     cleanupGame();
     show('screen-result');
@@ -440,33 +494,66 @@ function loop(t) {
   const now = Date.now();
   const inGrace = now < g.graceUntil;
 
-  // ---- カメラ回転 ----
+  // ---- カメラ回転 (スワイプ/ドラッグ) ----
   const look = input.consumeLook();
   g.camYaw -= look.dx * 0.0042; // 右ドラッグ=右を向く (three.jsは+z向き時+xが左)
   g.camPitch = THREE.MathUtils.clamp(g.camPitch + look.dy * 0.0035, -0.5, 1.1);
 
-  // ---- 移動 ----
+  // ---- ダッシュ & スタミナ ----
   const mv = input.getMove();
+  const moving = !!(mv.x || mv.y);
+  const wantSprint = input.getSprint() && moving;
+  if (g.stamLock && g.stamina > 30) g.stamLock = false;
+  const sprinting = wantSprint && !g.stamLock && g.stamina > 0;
+  if (sprinting) {
+    g.stamina = Math.max(0, g.stamina - dt * 26);
+    if (g.stamina <= 0) g.stamLock = true;
+  } else {
+    g.stamina = Math.min(100, g.stamina + dt * (moving ? 11 : 22));
+  }
+  const stBar = $('stamina-bar');
+  stBar.style.width = g.stamina + '%';
+  stBar.classList.toggle('low', g.stamina < 30);
+
+  // ---- 移動 (現実の人間のように慣性がある: 切り返し時は踏ん張る分だけ反応が鈍い) ----
   const locked = g.jailed || g.frozen || g.over || (inGrace && g.role === 'oni');
-  let speed = 0;
-  if (!locked && (mv.x || mv.y)) {
-    const maxSp = g.role === 'oni' ? MOVE_SPEED_ONI : MOVE_SPEED_RUN;
+  if (!locked && moving) {
+    let maxSp = g.role === 'oni' ? MOVE_SPEED_ONI : MOVE_SPEED_RUN;
+    if (sprinting) maxSp *= 1.33;
     // カメラ基準の移動方向
     const ang = Math.atan2(mv.x, -mv.y); // 上=前
     const wish = g.camYaw + Math.PI - ang; // (+z向き時+xは左なので右入力=角度マイナス)
     const mag = Math.min(1, Math.hypot(mv.x, mv.y));
-    speed = maxSp * mag;
-    g.vel.x = Math.sin(wish) * speed;
-    g.vel.z = Math.cos(wish) * speed;
+    const tvx = Math.sin(wish) * maxSp * mag;
+    const tvz = Math.cos(wish) * maxSp * mag;
+    // 現在速度と希望方向のずれで機動力を変える: 逆へ切り返すほど加速が効きにくい
+    const curSp = Math.hypot(g.vel.x, g.vel.z);
+    let align = 1;
+    if (curSp > 0.8) {
+      align = (g.vel.x * tvx + g.vel.z * tvz) / (curSp * Math.hypot(tvx, tvz));
+    }
+    const agility = g.onGround ? (6.5 + 6.5 * Math.max(0, align)) : 3.0;
+    const k = Math.min(1, dt * agility);
+    g.vel.x += (tvx - g.vel.x) * k;
+    g.vel.z += (tvz - g.vel.z) * k;
     // キャラの向きをなめらかに移動方向へ
     const targetYaw = wish;
     let dy = targetYaw - g.yaw;
     while (dy > Math.PI) dy -= Math.PI * 2;
     while (dy < -Math.PI) dy += Math.PI * 2;
-    g.yaw += dy * Math.min(1, dt * 12);
+    g.yaw += dy * Math.min(1, dt * 10);
   } else {
-    g.vel.x *= Math.max(0, 1 - dt * 12);
-    g.vel.z *= Math.max(0, 1 - dt * 12);
+    g.vel.x *= Math.max(0, 1 - dt * (g.onGround ? 9 : 2.5)); // 減速にも慣性 (空中はほぼ滑る)
+    g.vel.z *= Math.max(0, 1 - dt * (g.onGround ? 9 : 2.5));
+  }
+
+  // ---- 視点の自動追従: スワイプしていない間は進行方向へゆっくり向く ----
+  if (moving && performance.now() - input.lastLookT > 900) {
+    let dyaw = (g.yaw - Math.PI) - g.camYaw;
+    while (dyaw > Math.PI) dyaw -= Math.PI * 2;
+    while (dyaw < -Math.PI) dyaw += Math.PI * 2;
+    // 真後ろへ走るときは回さない (カメラが暴れるため)
+    if (Math.abs(dyaw) < 2.55) g.camYaw += dyaw * Math.min(1, dt * 3.0);
   }
 
   // ジャンプ
@@ -486,6 +573,7 @@ function loop(t) {
     g.onGround = res.onGround;
     if (g.onGround && g.vel.y < 0) g.vel.y = 0;
     if (g.onGround && !wasGround) { SFX.land(); vfx.dust(g.pos.clone()); }
+    if (res.bounced) { SFX.jump(); vfx.sparkle(g.pos.clone(), 0x66ddff); } // トランポリン
   }
 
   // 足音
@@ -581,7 +669,11 @@ function loop(t) {
   }
 
   // ---- カメラ ----
-  const eye = tmpV.set(g.pos.x, g.pos.y + 1.55, g.pos.z).clone();
+  // 階段のステップアップで pos.y が小刻みに跳ねるため、目線の高さだけ平滑化して振動を消す
+  const eyeFollow = g.onGround ? 9 : 25; // 空中(ジャンプ/落下)は素早く追従
+  g.camEyeY += (g.pos.y - g.camEyeY) * Math.min(1, dt * eyeFollow);
+  if (Math.abs(g.pos.y - g.camEyeY) > 2.5) g.camEyeY = g.pos.y; // 大きく離れたら追い付く
+  const eye = tmpV.set(g.pos.x, g.camEyeY + 1.55, g.pos.z).clone();
   const dist = 4.4;
   const cx = eye.x - Math.sin(g.camYaw + Math.PI) * Math.cos(g.camPitch) * dist;
   const cz = eye.z - Math.cos(g.camYaw + Math.PI) * Math.cos(g.camPitch) * dist;
