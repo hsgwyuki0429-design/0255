@@ -1,0 +1,25 @@
+{
+  "name": "oni-rush",
+  "version": "1.0.0",
+  "description": "3D online tag game (doro-kei / koori-oni / kawari-oni) with Three.js + Socket.IO + Supabase",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "http://local_proxy@127.0.0.1:41729/git/hsgwyuki0429-design/0255"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.110.7",
+    "express": "^5.2.1",
+    "socket.io": "^4.8.3",
+    "three": "^0.185.1"
+  }
+}

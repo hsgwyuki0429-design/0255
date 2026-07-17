@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d1220">
+<title>ONI RUSH ─ 3Dオンライン鬼ごっこ</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👹</text></svg>">
+<link rel="stylesheet" href="/css/style.css">
+<script src="/socket.io/socket.io.js"></script>
+<script type="importmap">
+{ "imports": { "three": "/vendor/three.module.js", "three/addons/utils/BufferGeometryUtils.js": "/vendor/BufferGeometryUtils.js" } }
+</script>
+</head>
+<body>
+<!-- ============ ホーム画面 ============ -->
+<div id="screen-home" class="screen active">
+  <div class="home-bg"></div>
+  <div class="home-inner">
+    <h1 class="logo">ONI<span>RUSH</span></h1>
+    <p class="tagline">3Dオンライン鬼ごっこ ─ 泥警・氷鬼・代わり鬼</p>
+    <div class="profile-card">
+      <input id="inp-name" maxlength="12" placeholder="ニックネーム">
+      <div class="rate-badge">レート <b id="my-rating">----</b><span id="my-tier"></span></div>
+    </div>
+    <div class="home-cols">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>公開ルーム</h2>
+          <button id="btn-refresh" class="mini">↻</button>
+        </div>
+        <div id="room-list" class="room-list"><div class="empty">部屋がありません。作ってみよう!</div></div>
+        <div class="join-private">
+          <input id="inp-password-join" maxlength="16" placeholder="合言葉で参加">
+          <button id="btn-join-private">参加</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><h2>ランキング</h2></div>
+        <ol id="ranking" class="ranking"></ol>
+      </div>
+    </div>
+    <button id="btn-create" class="big-btn">部屋を作る</button>
+  </div>
+</div>
+
+<!-- ============ 部屋作成モーダル ============ -->
+<div id="modal-create" class="modal hidden">
+  <div class="modal-box">
+    <h2>部屋を作る</h2>
+    <label>部屋名 <input id="c-name" maxlength="24" placeholder="だれでもどうぞ!"></label>
+    <label>ルール
+      <div class="seg" id="c-mode">
+        <button data-v="doro" class="on">泥警</button><button data-v="koori">氷鬼</button><button data-v="kawari">代わり鬼</button>
+      </div>
+    </label>
+    <label>マップ
+      <div class="seg" id="c-map">
+        <button data-v="school" class="on">学校</button><button data-v="mall">モール</button><button data-v="cave">地下洞窟</button>
+      </div>
+    </label>
+    <div class="row2">
+      <label>鬼の人数
+        <select id="c-oni"><option>1</option><option>2</option><option>3</option><option>4</option></select>
+      </label>
+      <label>制限時間
+        <select id="c-time">
+          <option value="120">2分</option><option value="180" selected>3分</option>
+          <option value="300">5分</option><option value="480">8分</option>
+        </select>
+      </label>
+    </div>
+    <label class="chk"><input type="checkbox" id="c-private"> 非公開にする(合言葉が必要)</label>
+    <input id="c-password" maxlength="16" placeholder="合言葉" class="hidden">
+    <div class="modal-btns">
+      <button id="c-cancel" class="ghost">やめる</button>
+      <button id="c-ok" class="big-btn">作成!</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ロビー ============ -->
+<div id="screen-lobby" class="screen">
+  <div class="home-bg"></div>
+  <div class="lobby-inner">
+    <h2 id="lobby-title">部屋</h2>
+    <div id="lobby-info" class="lobby-info"></div>
+    <div id="lobby-players" class="lobby-players"></div>
+    <div id="lobby-opts" class="lobby-opts hidden">
+      <div class="seg" id="l-mode"><button data-v="doro">泥警</button><button data-v="koori">氷鬼</button><button data-v="kawari">代わり鬼</button></div>
+      <div class="seg" id="l-map"><button data-v="school">学校</button><button data-v="mall">モール</button><button data-v="cave">地下洞窟</button></div>
+      <div class="row2">
+        <label>鬼 <select id="l-oni"><option>1</option><option>2</option><option>3</option><option>4</option></select></label>
+        <label>時間 <select id="l-time"><option value="120">2分</option><option value="180">3分</option><option value="300">5分</option><option value="480">8分</option></select></label>
+      </div>
+    </div>
+    <div class="lobby-btns">
+      <button id="btn-leave" class="ghost">退出</button>
+      <button id="btn-start" class="big-btn hidden">ゲーム開始!</button>
+      <div id="wait-host" class="wait-host">ホストの開始を待っています…</div>
+    </div>
+    <div id="countdown-overlay" class="countdown hidden"></div>
+  </div>
+</div>
+
+<!-- ============ ゲーム画面 ============ -->
+<div id="screen-game" class="screen">
+  <canvas id="game-canvas"></canvas>
+  <div id="hud">
+    <div id="hud-top">
+      <div id="hud-role" class="hud-role">👹 鬼</div>
+      <div id="hud-timer">3:00</div>
+      <div id="hud-count">👤 0/0</div>
+    </div>
+    <canvas id="minimap" width="240" height="240"></canvas>
+    <div id="hud-msg"></div>
+    <div id="grace-overlay" class="hidden">スタートまで <b id="grace-n">5</b></div>
+    <div id="status-overlay" class="hidden"></div>
+    <div id="touch-hint" class="hidden">🤝 タッチで助ける!</div>
+  </div>
+  <!-- モバイル操作: 左=仮想スティック / 右下=撃つ / 右のそれ以外タップ=ジャンプ -->
+  <div id="stick-zone"><div id="stick-base" class="hidden"><div id="stick-knob"></div></div></div>
+  <div id="right-zone"></div>
+  <button id="btn-shoot" class="hidden"><span>撃つ</span></button>
+  <div id="jump-hint" class="jump-hint">右側タップでジャンプ</div>
+</div>
+
+<!-- ============ 結果画面 ============ -->
+<div id="screen-result" class="screen">
+  <div class="home-bg"></div>
+  <div class="result-inner">
+    <h2 id="result-title">ゲーム終了!</h2>
+    <div id="result-winner"></div>
+    <div id="result-list" class="result-list"></div>
+    <button id="btn-back-lobby" class="big-btn">ロビーへ戻る</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script type="module" src="/js/main.js"></script>
+</body>
+</html>

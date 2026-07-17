@@ -1,0 +1,14 @@
+# Render Blueprint: リポジトリ直結で1クリックデプロイできる定義
+services:
+  - type: web
+    name: oni-rush
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: SUPABASE_URL
+        sync: false   # ダッシュボードで入力 (未設定でも動く: ローカルファイル保存になる)
+      - key: SUPABASE_SERVICE_KEY
+        sync: false

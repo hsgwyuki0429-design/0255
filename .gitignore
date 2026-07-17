@@ -1,0 +1,4 @@
+node_modules/
+data/ratings.json
+.env
+*.log
