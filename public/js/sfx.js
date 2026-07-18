@@ -54,5 +54,11 @@ export const SFX = {
   win()        { [523, 659, 784, 1046, 1319].forEach((f, i) => tone(f, 0.25, 'triangle', 0.3, null, i * 0.12)); },
   lose()       { [400, 350, 300, 250].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.22, f * 0.9, i * 0.15)); },
   join()       { tone(660, 0.1, 'triangle', 0.2); tone(880, 0.1, 'triangle', 0.2, null, 0.08); },
-  touch()      { tone(1046, 0.1, 'triangle', 0.25); tone(1319, 0.12, 'triangle', 0.22, null, 0.06); }
+  touch()      { tone(1046, 0.1, 'triangle', 0.25); tone(1319, 0.12, 'triangle', 0.22, null, 0.06); },
+  whistle()    { // 審判の笛: ピッ・ピィーッ (2枚重ねでうなりを出す)
+    tone(2350, 0.14, 'square', 0.16, 2450);
+    tone(2320, 0.14, 'sine', 0.12, 2420);
+    tone(2350, 0.55, 'square', 0.16, 2250, 0.22);
+    tone(2395, 0.55, 'sine', 0.12, 2295, 0.22);
+  }
 };

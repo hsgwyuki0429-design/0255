@@ -27,8 +27,10 @@ const PORT = process.env.PORT || 3000;
 // ---------------- 定数 ----------------
 const MODES = { doro: '泥警', koori: '氷鬼', kawari: '代わり鬼' };
 const MAX_PLAYERS = 10;
-const CATCH_RANGE = 1.0;     // 鬼の捕獲判定: 体の中心同士がこの距離まで近づいたらタッチ
+const CATCH_RANGE = 1.25;    // 鬼の捕獲判定: 体の中心同士がこの距離まで近づいたらタッチ
 const CATCH_DY = 1.4;        // 捕獲判定の高さ許容 (段差ずれ)
+const CATCH_LAG_SLACK = 1.2; // クライアント申告の捕獲に許す通信ラグぶんの距離余裕
+const NO_CATCH_WHISTLE_MS = 30000; // 誰も捕まらない時間がこれを超えると笛が鳴る
 const TOUCH_RANGE = 1.7;     // 救出/氷解除の接触距離
 const GRACE_MS = 5000;       // 開始時に鬼が動けない猶予
 const SWAP_IMMUNE_MS = 3000; // 代わり鬼: タッチバック禁止時間
@@ -164,6 +166,7 @@ class Room {
     const g = this.game = {
       startAt: Date.now(), endsAt: Date.now() + this.timeLimit * 1000,
       graceUntil: Date.now() + GRACE_MS,
+      lastCatchAt: Date.now() + GRACE_MS, // 笛タイマー: 猶予明けから計測
       players: new Map(), lastSnap: {}, over: false
     };
     let oi = 0, ri = 0;
@@ -219,9 +222,15 @@ class Room {
   tick() {
     const g = this.game;
     if (!g || g.over) return;
-    const remain = g.endsAt - Date.now();
+    const now = Date.now();
+    const remain = g.endsAt - now;
     io.to(this.id).emit('timeSync', { remain: Math.max(0, remain) });
     if (remain <= 0) return this.finish('time');
+    // 一定時間 誰も捕まらないと審判の笛が鳴る (鳴るたびにタイマーは仕切り直し)
+    if (now - g.lastCatchAt > NO_CATCH_WHISTLE_MS) {
+      g.lastCatchAt = now;
+      io.to(this.id).emit('ev', { type: 'whistle' });
+    }
     // 全捕獲チェック
     const runners = [...g.players.values()].filter(p => p.role === 'run');
     if (this.mode === 'doro' && runners.length && runners.every(p => p.jailed)) return this.finish('allCaught');
@@ -269,6 +278,7 @@ class Room {
   onHit(oni, target) {
     const g = this.game;
     const now = Date.now();
+    g.lastCatchAt = now; // 笛タイマーをリセット
     oni.stats.tags++;
     target.stats.caughtCount++;
     const targetName = this.members.get(target.id)?.name;
@@ -295,7 +305,19 @@ class Room {
     const g = this.game; if (!g || g.over) return;
     const gp = g.players.get(p.id), tp = g.players.get(targetId);
     if (!gp || !tp) return;
-    if (gp.role !== 'run' || gp.jailed || gp.frozen) return;
+    if (gp.jailed || gp.frozen) return;
+    // ---- 鬼のタッチ捕獲 (クライアント申告): 画面上で触れた瞬間に申告が来る。
+    //      通信ラグでサーバー上の位置はずれるため、余裕を持たせた距離で検証する ----
+    if (gp.role === 'oni') {
+      const now = Date.now();
+      if (now < g.graceUntil) return;
+      if (tp.role !== 'run' || tp.jailed || tp.frozen || now < tp.immuneUntil) return;
+      const d2 = Math.hypot(gp.pos[0] - tp.pos[0], gp.pos[2] - tp.pos[2]);
+      if (d2 > CATCH_RANGE + CATCH_LAG_SLACK || Math.abs(gp.pos[1] - tp.pos[1]) > 1.6) return;
+      this.onHit(gp, tp);
+      return;
+    }
+    if (gp.role !== 'run') return;
     const dist = Math.hypot(gp.pos[0] - tp.pos[0], gp.pos[1] - tp.pos[1], gp.pos[2] - tp.pos[2]);
     if (dist > TOUCH_RANGE + 1.0) return; // 多少の遅延を許容
     if (this.mode === 'doro' && tp.jailed) {
