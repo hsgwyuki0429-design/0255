@@ -318,11 +318,11 @@ function buildMall() {
   // ゴンドラ陳列棚 6列 (中央に通り抜けギャップ)
   for (let r = 0; r < 6; r++) {
     const gz = -18 + r * 6;
-    boxes.push(B(-49.5, 0, gz, 7, 1.9, 1.0, 0xbcc8d0, 'shelf'));
-    boxes.push(B(-40.5, 0, gz, 7, 1.9, 1.0, 0xbcc8d0, 'shelf'));
+    boxes.push(B(-49.5, 0, gz, 7, 1.9, 1.0, 0xbcc8d0, 'goods'));
+    boxes.push(B(-40.5, 0, gz, 7, 1.9, 1.0, 0xbcc8d0, 'goods'));
   }
   // 冷蔵ケース (西壁ぞい) と青果平台
-  boxes.push(B(-54.9, 0, -10, 1.2, 1.9, 26, 0x9fb8c8, 'metal'));
+  boxes.push(B(-54.9, 0, -10, 1.2, 1.9, 26, 0x9fb8c8, 'goods'));
   boxes.push(B(-50, 0, 24, 4.5, 0.9, 3, 0x7aa86a, 'wood'), B(-42, 0, 24, 4.5, 0.9, 3, 0x7aa86a, 'wood'));
   // レジカウンター (跳び乗れる)
   boxes.push(B(-36, 0, -8, 2.6, 0.95, 1.1, 0xd0d5da, 'metal'), B(-36, 0, 8, 2.6, 0.95, 1.1, 0xd0d5da, 'metal'));
@@ -395,8 +395,8 @@ function buildMall() {
   // 北A: ドラッグストア / 北B: 100均 (棚の迷路)
   for (const [cx, seg] of [[-28, 0], [-15, 1]]) {
     for (let r = 0; r < 2; r++) {
-      boxes.push(B(cx - 2.5, 0, -17 + r * 4.5, 1.0, 1.7, 3.2, 0x7fa8d0, 'shelf'));
-      boxes.push(B(cx + 2.5, 0, -17 + r * 4.5, 1.0, 1.7, 3.2, 0x7fa8d0, 'shelf'));
+      boxes.push(B(cx - 2.5, 0, -17 + r * 4.5, 1.0, 1.7, 3.2, 0x7fa8d0, 'goods'));
+      boxes.push(B(cx + 2.5, 0, -17 + r * 4.5, 1.0, 1.7, 3.2, 0x7fa8d0, 'goods'));
     }
     boxes.push(B(cx, 0, -9.5, 3, 0.95, 1.0, 0x9c8f80, 'wood'));
   }
@@ -408,8 +408,8 @@ function buildMall() {
   }
   // 南F: 靴屋 / 南G: 本・文具 / 南H/I/J: カフェ・雑貨
   for (const cx of [-28, -15]) {
-    boxes.push(B(cx, 0, 13, 5.5, 1.5, 0.9, 0x8a7f72, 'shelf'));
-    boxes.push(B(cx, 0, 17, 5.5, 1.5, 0.9, 0x8a7f72, 'shelf'));
+    boxes.push(B(cx, 0, 13, 5.5, 1.5, 0.9, 0x8a7f72, 'goods'));
+    boxes.push(B(cx, 0, 17, 5.5, 1.5, 0.9, 0x8a7f72, 'goods'));
   }
   for (const [tx, tz] of [[16, 13], [20, 16], [16, 18], [30, 13], [37, 16], [30, 18]]) {
     boxes.push(B(tx, 0, tz, 1.4, 0.75, 1.4, 0xc9a06a, 'wood')); // カフェテーブル
@@ -433,7 +433,7 @@ function buildMall() {
   boxes.push(B(50, 0, 26, 2.2, 0.45, 2.2, 0x66ddff, 'metal', { bounce: 1, glow: 1 }));
   boxes.push(B(45, 0, 26.5, 1.2, 0.6, 1.2, 0xff8fb3, 'metal'), B(46.8, 0, 27.5, 1.0, 0.9, 1.0, 0x8ce99a, 'metal'));
   // 自販機コーナー (北東角)
-  boxes.push(B(47, 0, -27.5, 6, 1.9, 1.1, 0xdd4444, 'metal'));
+  boxes.push(B(47, 0, -27.5, 6, 1.9, 1.1, 0xdd4444, 'vend'));
 
   // ============ エスカレーター相当の階段 (勾配ゆるめ 20段) ============
   boxes.push(...stairs(-5.5, 0, -11, 'e', 2.2, 20, 0.25, 0.5, 0x99a0aa, 'metal'));  // 中央コート東行き (上端x≈4.3)
@@ -500,8 +500,8 @@ function buildMall() {
   }
   // 北2F: 未来屋風書店 (本棚の迷路) x[-34,-8]
   for (let r = 0; r < 3; r++) {
-    boxes.push(B(-28, F2, -17.5 + r * 3.6, 8, 2.1, 0.9, 0x8a6a44, 'shelf'));
-    boxes.push(B(-15, F2, -17.5 + r * 3.6, 8, 2.1, 0.9, 0x8a6a44, 'shelf'));
+    boxes.push(B(-28, F2, -17.5 + r * 3.6, 8, 2.1, 0.9, 0x8a6a44, 'books'));
+    boxes.push(B(-15, F2, -17.5 + r * 3.6, 8, 2.1, 0.9, 0x8a6a44, 'books'));
   }
   boxes.push(B(-21, F2 + 4.6, -7, 10, 1.0, 0.3, 0x2a9d5c, 'sign', { deco: 1, glow: 1 }));
   // 北2F東側: 雑貨・携帯ショップ
@@ -513,8 +513,8 @@ function buildMall() {
   const gameCols = [0xff5f7a, 0x54c2ff, 0xffd166, 0x9b8cff, 0x66e0aa];
   let gi = 0;
   for (const gx of [-30, -25, -20, -15, -10]) {
-    boxes.push(B(gx, F2, 11.5, 1.7, 1.75, 1.7, gameCols[gi % 5], 'metal', { glow: 1 }));
-    boxes.push(B(gx, F2, 17.5, 1.7, 1.75, 1.7, gameCols[(gi + 2) % 5], 'metal', { glow: 1 }));
+    boxes.push(B(gx, F2, 11.5, 1.7, 1.75, 1.7, gameCols[gi % 5], 'arcade', { glow: 1 }));
+    boxes.push(B(gx, F2, 17.5, 1.7, 1.75, 1.7, gameCols[(gi + 2) % 5], 'arcade', { glow: 1 }));
     gi++;
   }
   boxes.push(B(-21, F2 + 4.6, 7, 12, 1.1, 0.3, 0xffb14d, 'sign', { deco: 1, glow: 1 })); // ゲームコーナー看板
@@ -695,8 +695,8 @@ function buildSchool() {
     if (is1F) {
       // 図書館: 本棚の列 (間を通り抜けられる) + 閲覧テーブル + カウンター
       for (const sz of [-35.6, -33.2, -30.8]) {
-        boxes.push(B(5.5, Y, sz, 7, 2.0, 0.8, 0x8a6a44, 'shelf'));
-        boxes.push(B(15.5, Y, sz, 7, 2.0, 0.8, 0x8a6a44, 'shelf'));
+        boxes.push(B(5.5, Y, sz, 7, 2.0, 0.8, 0x8a6a44, 'books'));
+        boxes.push(B(15.5, Y, sz, 7, 2.0, 0.8, 0x8a6a44, 'books'));
       }
       boxes.push(B(4, Y, -29.3, 3.2, 0.75, 1.1, 0xc9a878, 'wood')); // 閲覧テーブル
       boxes.push(B(17, Y, -29.3, 3.2, 0.75, 1.1, 0xc9a878, 'wood'));
@@ -713,7 +713,7 @@ function buildSchool() {
         boxes.push(B(cx, Y, -36.8, 2.0, 0.85, 0.9, 0x8a6a44, 'wood')); // 教卓
       }
     } else {
-      for (const [x1, x2] of roomsX) boxes.push(B((x1 + x2) / 2, Y, -36.9, 5, 1.8, 0.8, 0x8a92a0, 'metal')); // ロッカー
+      for (const [x1, x2] of roomsX) boxes.push(B((x1 + x2) / 2, Y, -36.9, 5, 1.8, 0.8, 0x8a92a0, 'locker')); // ロッカー
       boxes.push(B(-16.5, Y, -32, 2.6, 1.0, 1.6, 0x2a2a30, 'wood')); // グランドピアノ (音楽室)
     }
     // ---- ウイング: 廊下(中庭側 x∓[20,24]) と部屋 x∓[24,34] ----
@@ -775,7 +775,7 @@ function buildSchool() {
 
   // ============ 武道場 (南東 x[24,46] z[16,34]) ============
   boxes.push(B(35, 0, 25, 22, 0.12, 18, 0xb08a54, 'wood'));                        // 板の間
-  boxes.push(B(33, 0.12, 25, 16, 0.1, 14, 0x9fb27a, 'tile'));                      // 畳 (乗れる)
+  boxes.push(B(33, 0.12, 25, 16, 0.1, 14, 0x9fb27a, 'tatami'));                    // 畳 (乗れる)
   boxes.push(...wallX(24, 46, 16, 0, 5.5, 0.5, [[28, 31], [39, 42]], GYMC));       // 北面: 入口2
   boxes.push(...wallX(24, 46, 34, 0, 5.5, 0.5, [], GYMC));
   boxes.push(...wallZ(16, 34, 24, 0, 5.5, 0.5, [[22, 25]], GYMC));                 // 西面にも入口
@@ -830,26 +830,26 @@ function buildSchool() {
     // 外壁の窓ガラス帯 (北面と両ウイング外側)
     for (let wx = -30; wx <= 30; wx += 5) {
       if (fl === 0 && wx === 0) continue; // 1F裏口
-      boxes.push(B(wx, Y + 1.2, -38.36, 2.6, 1.5, 0.18, GLASS, 'metal', { deco: 1 }));
+      boxes.push(B(wx, Y + 1.2, -38.36, 2.6, 1.5, 0.18, GLASS, 'glass', { deco: 1 }));
     }
     for (let wz = -21; wz <= 5; wz += 4) {
-      boxes.push(B(-34.36, Y + 1.2, wz, 0.18, 1.5, 2.4, GLASS, 'metal', { deco: 1 }));
-      boxes.push(B(34.36, Y + 1.2, wz, 0.18, 1.5, 2.4, GLASS, 'metal', { deco: 1 }));
+      boxes.push(B(-34.36, Y + 1.2, wz, 0.18, 1.5, 2.4, GLASS, 'glass', { deco: 1 }));
+      boxes.push(B(34.36, Y + 1.2, wz, 0.18, 1.5, 2.4, GLASS, 'glass', { deco: 1 }));
     }
     // 教室の黒板 (2F/3Fの各教室の北壁)
     if (fl === 1 || fl === 2) {
       for (const [x1, x2] of [[-22, -11], [-11, 0], [0, 11], [11, 22]]) {
-        boxes.push(B((x1 + x2) / 2, Y + 0.85, -37.55, 3.4, 1.15, 0.12, 0x2a5a44, 'metal', { deco: 1 }));
+        boxes.push(B((x1 + x2) / 2, Y + 0.85, -37.55, 3.4, 1.15, 0.12, 0x2a5a44, 'board', { deco: 1 }));
       }
     }
     // 廊下の消火器と掲示板
     boxes.push(B(-19.5, Y, -27.55, 0.22, 0.55, 0.22, 0xdd3333, 'metal', { deco: 1 }));
     boxes.push(B(19.5, Y, -27.55, 0.22, 0.55, 0.22, 0xdd3333, 'metal', { deco: 1 }));
-    boxes.push(B(-6, Y + 1.1, -27.7, 3, 1.2, 0.1, 0x7a9a6a, 'wood', { deco: 1 }));
-    boxes.push(B(6, Y + 1.1, -27.7, 3, 1.2, 0.1, 0xc9b98a, 'wood', { deco: 1 }));
+    boxes.push(B(-6, Y + 1.1, -27.7, 3, 1.2, 0.1, 0x7a9a6a, 'poster', { deco: 1 }));
+    boxes.push(B(6, Y + 1.1, -27.7, 3, 1.2, 0.1, 0xc9b98a, 'poster', { deco: 1 }));
   }
   // 昇降口の下駄箱 (1F廊下・出入口の両脇)
-  for (const gx of [-16.5, -7.5, 7.5, 16.5]) boxes.push(B(gx, 0, -24.6, 2.4, 1.0, 0.5, 0x9a8a74, 'shelf', { deco: 1 }));
+  for (const gx of [-16.5, -7.5, 7.5, 16.5]) boxes.push(B(gx, 0, -24.6, 2.4, 1.0, 0.5, 0x9a8a74, 'locker', { deco: 1 }));
   // 本棟南面の大時計 (中庭から見える)
   boxes.push(B(0, FH * 3 + 1.6, -23.6, 1.5, 1.5, 0.15, 0xf6f6f0, 'metal', { deco: 1 }));
   boxes.push(B(0, FH * 3 + 2.25, -23.55, 0.1, 0.55, 0.08, 0x22262c, 'metal', { deco: 1 }));
