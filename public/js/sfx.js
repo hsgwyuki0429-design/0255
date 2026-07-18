@@ -39,7 +39,6 @@ function noise(dur, vol = 0.3, freq = 1000, q = 1, when = 0) {
 }
 
 export const SFX = {
-  shoot()      { noise(0.12, 0.5, 2200, 0.8); tone(320, 0.14, 'square', 0.22, 90); },
   hit()        { tone(880, 0.1, 'square', 0.3, 440); noise(0.08, 0.3, 3000, 1); },
   jump()       { tone(240, 0.18, 'sine', 0.25, 480); },
   land()       { noise(0.1, 0.25, 300, 0.7); },
@@ -55,6 +54,5 @@ export const SFX = {
   win()        { [523, 659, 784, 1046, 1319].forEach((f, i) => tone(f, 0.25, 'triangle', 0.3, null, i * 0.12)); },
   lose()       { [400, 350, 300, 250].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.22, f * 0.9, i * 0.15)); },
   join()       { tone(660, 0.1, 'triangle', 0.2); tone(880, 0.1, 'triangle', 0.2, null, 0.08); },
-  touch()      { tone(1046, 0.1, 'triangle', 0.25); tone(1319, 0.12, 'triangle', 0.22, null, 0.06); },
-  denied()     { tone(180, 0.15, 'square', 0.2); }
+  touch()      { tone(1046, 0.1, 'triangle', 0.25); tone(1319, 0.12, 'triangle', 0.22, null, 0.06); }
 };
