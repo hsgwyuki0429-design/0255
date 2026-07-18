@@ -52,7 +52,7 @@
       <button id="btn-cpu" class="big-btn cpu">🤖 CPUと遊ぶ</button>
     </div>
   </div>
-  <div class="version-tag">バージョン1.3</div>
+  <div class="version-tag">バージョン1.4</div>
 </div>
 
 <!-- ============ CPU戦モーダル ============ -->
@@ -165,7 +165,7 @@
     </div>
     <canvas id="minimap" width="240" height="240"></canvas>
     <div id="hud-msg"></div>
-    <div id="grace-overlay" class="hidden">スタートまで <b id="grace-n">5</b></div>
+    <div id="grace-overlay" class="hidden"><span id="grace-label">スタートまで</span> <b id="grace-n">5</b></div>
     <div id="status-overlay" class="hidden"></div>
     <div id="touch-hint" class="hidden">🤝 タッチで助ける!</div>
     <div id="stamina-wrap"><div id="stamina-bar"></div></div>
@@ -174,6 +174,8 @@
   <div id="stick-zone"><div id="stick-base" class="hidden"><div id="stick-knob"></div></div></div>
   <div id="right-zone"></div>
   <button id="btn-view">🎥 三人称</button>
+  <button id="btn-mute">🔊</button>
+  <button id="btn-exit">🚪</button>
   <button id="btn-dash"><span>🏃</span></button>
   <div id="jump-hint" class="jump-hint">右側タップでジャンプ</div>
 </div>
