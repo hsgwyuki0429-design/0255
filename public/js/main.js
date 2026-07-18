@@ -334,10 +334,9 @@ function updateCountHUD() {
   $('hud-count').textContent = `${label} 逃げ残り ${free}/${rs.length}`;
 }
 
-function hudMsg(text, color = '#fff') {
+function hudMsg(text) {
   const el = document.createElement('div');
   el.className = 'msg-line';
-  el.style.color = color;
   el.textContent = text;
   $('hud-msg').appendChild(el);
   while ($('hud-msg').children.length > 4) $('hud-msg').firstChild.remove();
