@@ -214,7 +214,7 @@ function initRenderer() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, input.isTouch ? 2 : 2));
   renderer.shadowMap.enabled = !input.isTouch;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 200);
+  camera = new THREE.PerspectiveCamera(140, innerWidth / innerHeight, 0.1, 200); // 視野を従来(70)の2倍に
   window.addEventListener('resize', () => {
     renderer.setSize(innerWidth, innerHeight);
     camera.aspect = innerWidth / innerHeight;
@@ -673,8 +673,9 @@ function loop(t) {
   const eyeFollow = g.onGround ? 9 : 25; // 空中(ジャンプ/落下)は素早く追従
   g.camEyeY += (g.pos.y - g.camEyeY) * Math.min(1, dt * eyeFollow);
   if (Math.abs(g.pos.y - g.camEyeY) > 2.5) g.camEyeY = g.pos.y; // 大きく離れたら追い付く
-  const eye = tmpV.set(g.pos.x, g.camEyeY + 1.55, g.pos.z).clone();
-  const dist = 4.4;
+  // キャラが半分サイズ + 広角(FOV 2倍)になったので、注視点を低く・カメラを近くして収まりを合わせる
+  const eye = tmpV.set(g.pos.x, g.camEyeY + 0.95, g.pos.z).clone();
+  const dist = 2.8;
   const cx = eye.x - Math.sin(g.camYaw + Math.PI) * Math.cos(g.camPitch) * dist;
   const cz = eye.z - Math.cos(g.camYaw + Math.PI) * Math.cos(g.camPitch) * dist;
   const cy = eye.y + Math.sin(g.camPitch) * dist;

@@ -1,28 +1,30 @@
 // ============================================================
-// 関節付き人型キャラクター + 手続きアニメーション
-// カプセル・球ベースの丸みのある体型。骨盤と脚は関節球で連結し
-// 腰まわりの隙間が出ないように各パーツをオーバーラップさせている。
-// 歩行/走行サイクル・腕振り+肘曲げ・膝上げ・骨盤の上下/左右動・
-// 体幹のひねり・前傾・空中姿勢・着地衝撃・射撃構え・凍結/捕縛ポーズ・
-// 呼吸・首の向き・ペイント弾の被弾痕 まで表現する
+// 豆キャラ (まめっこ) + 手続きアニメーション
+// 緑のカプセル型ボディ・黒い点目・頭に芽 (細い茎+黄色い玉)。
+// 関節ジョイント (骨盤/背骨/胸/首/腕) は残してあり、歩行/走行時の
+// 前傾・ひねり・呼吸・射撃構え・凍結/捕縛ポーズ・被弾ペイントを表現する。
+// 手足はほぼ見えない豆型なので、移動感は体の傾き・バウンドで出す。
 // ============================================================
 import * as THREE from 'three';
 
-const SKIN = 0xf0c8a0;
-export const BODY_COLORS = [0x4488ee, 0x44cc77, 0xeeaa33, 0xaa66ee, 0x66ccdd, 0xee6699, 0x99bb44, 0xdd8855, 0x8899aa, 0xcc5555];
+// 体の大きさ (以前の人型の半分)
+export const MODEL_SCALE = 0.5;
 
-function mat(color) { return new THREE.MeshStandardMaterial({ color, roughness: 0.72 }); }
+// プレイヤー識別用のボディ色 (豆の色。緑系を軸にカラフルに)
+export const BODY_COLORS = [0x5f8f4e, 0x4bb5c9, 0xe0a94a, 0x9b6fd0, 0x66c48a, 0xe0738f, 0xb7c959, 0xd88a55, 0x7f93b0, 0xcf5b5b];
+
+function mat(color) { return new THREE.MeshStandardMaterial({ color, roughness: 0.62 }); }
 
 // 丸い縦長パーツ (カプセル)。py = 中心のy位置
 function capsule(r, len, color, py = 0) {
-  const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 3, 10), mat(color));
+  const m = new THREE.Mesh(new THREE.CapsuleGeometry(r, len, 4, 12), mat(color));
   m.position.y = py;
   m.castShadow = true;
   return m;
 }
 // 球パーツ (sx,sy,sz でつぶして丸みを調整)
 function ball(r, color, py = 0, sx = 1, sy = 1, sz = 1) {
-  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 10), mat(color));
+  const m = new THREE.Mesh(new THREE.SphereGeometry(r, 14, 12), mat(color));
   m.position.y = py;
   m.scale.set(sx, sy, sz);
   m.castShadow = true;
@@ -32,78 +34,81 @@ function ball(r, color, py = 0, sx = 1, sy = 1, sz = 1) {
 export class Humanoid {
   constructor(colorIdx = 0, name = '') {
     const c = BODY_COLORS[colorIdx % BODY_COLORS.length];
-    const dark = new THREE.Color(c).multiplyScalar(0.55).getHex();
-    const mid = new THREE.Color(c).multiplyScalar(0.8).getHex();
+    const dark = new THREE.Color(c).multiplyScalar(0.6).getHex();
+    const sproutStem = 0x6f9a3e, sproutBall = 0xf2e6a0;
     this.color = c;
     this.root = new THREE.Group();          // 地面基準
+    this.root.scale.setScalar(MODEL_SCALE); // 半分サイズ
     this.body = new THREE.Group();          // 上下動用
     this.root.add(this.body);
 
-    // ---- 骨盤・胴体・頭 (骨盤球→腹球→胸カプセルが重なり合い、隙間なく繋がる) ----
+    // ---- アニメ用ジョイント (見た目は豆ひとつだが内部骨格は残す) ----
     this.pelvis = new THREE.Group(); this.pelvis.position.y = 0.94; this.body.add(this.pelvis);
-    this.pelvis.add(ball(0.155, dark, -0.02, 1.25, 0.8, 1.0));            // 腰 (丸いヒップ)
-    this.spine = new THREE.Group(); this.spine.position.y = 0.06; this.pelvis.add(this.spine);
-    this.spine.add(ball(0.14, mid, 0.05, 1.2, 0.9, 0.92));                // 腹 (骨盤と胸を繋ぐ)
-    this.chestG = new THREE.Group(); this.chestG.position.y = 0.18; this.spine.add(this.chestG);
-    this.chestG.add(capsule(0.155, 0.17, c, 0.16));                       // 胸
-    this.chestG.children[0].scale.set(1.18, 1, 0.88);
-    this.neck = new THREE.Group(); this.neck.position.y = 0.4; this.chestG.add(this.neck);
-    this.neck.add(capsule(0.05, 0.06, SKIN, 0.02));                       // 首
-    this.neck.add(ball(0.148, SKIN, 0.16, 1, 1.05, 1));                   // 頭 (丸)
-    this.neck.add(ball(0.152, dark, 0.2, 1, 0.82, 1));                    // 髪
-    const eyeM = new THREE.MeshBasicMaterial({ color: 0x222222 });
+    this.spine = new THREE.Group(); this.spine.position.y = 0.06; this.pelvis.add(this.spine);       // 体幹中心 (body空間 y≈1.0)
+    this.chestG = new THREE.Group(); this.chestG.position.y = 0.18; this.spine.add(this.chestG);      // body空間 y≈1.18
+    this.neck = new THREE.Group(); this.neck.position.y = 0.4; this.chestG.add(this.neck);            // body空間 y≈1.58
+
+    // ---- 豆型ボディ本体 (地面〜頭までの一本カプセル。spineに付けて一体で動く) ----
+    const bean = capsule(0.35, 0.76, c, -0.21);   // spine基準: body空間 y≈0.06〜1.52
+    bean.scale.set(1, 1, 0.9);
+    this.spine.add(bean);
+
+    // ---- 黒い点目 (体の上寄り前面) ----
+    const eyeM = new THREE.MeshStandardMaterial({ color: 0x1b1b22, roughness: 0.4 });
     for (const s of [-1, 1]) {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.022, 8, 8), eyeM);
-      eye.scale.set(1, 1.5, 0.6);
-      eye.position.set(s * 0.058, 0.155, 0.135); this.neck.add(eye);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 12), eyeM);
+      eye.scale.set(1, 1.25, 0.6);
+      eye.position.set(s * 0.11, 0.06, 0.3); // spine基準: body空間 y≈1.06
+      this.spine.add(eye);
     }
 
-    // ---- 腕 (肩球 → 上腕 → 肘球 → 前腕 → 手球) ----
+    // ---- 頭の芽 (細い茎 + 黄色い玉) : 首に付けて向きに合わせて揺れる ----
+    const stem = capsule(0.02, 0.13, sproutStem, 0.0); this.neck.add(stem);   // body空間 y≈1.51〜1.65
+    this.neck.add(ball(0.055, sproutBall, 0.12, 1, 1.1, 1));                  // 芽の玉 body空間 y≈1.70
+    // 芽の小さな葉
+    for (const s of [-1, 1]) {
+      const leaf = ball(0.03, sproutStem, 0.05, 1.6, 0.6, 0.5);
+      leaf.position.set(s * 0.035, 0.05, 0); leaf.rotation.z = s * 0.5; this.neck.add(leaf);
+    }
+
+    // ---- 腕 (小さな手。銃の取り付け & 構え用にジョイントは残す) ----
     this.arms = {};
     for (const s of [-1, 1]) {
       const shoulder = new THREE.Group();
-      shoulder.position.set(s * 0.225, 0.33, 0); this.chestG.add(shoulder);
-      shoulder.add(ball(0.075, c, 0));                                    // 肩の丸み
-      shoulder.add(capsule(0.055, 0.16, c, -0.15));                       // 上腕
-      const elbow = new THREE.Group(); elbow.position.y = -0.3; shoulder.add(elbow);
-      elbow.add(ball(0.052, c, 0));                                       // 肘
-      elbow.add(capsule(0.046, 0.14, SKIN, -0.13));                       // 前腕
-      elbow.add(ball(0.06, SKIN, -0.29, 1, 0.9, 1));                      // 手
+      shoulder.position.set(s * 0.29, 0.02, 0.02); this.chestG.add(shoulder); // 体の側面 (body空間 y≈1.2)
+      shoulder.add(capsule(0.05, 0.08, c, -0.09));                            // 短い腕
+      const elbow = new THREE.Group(); elbow.position.y = -0.18; shoulder.add(elbow);
+      elbow.add(ball(0.055, c, -0.05, 1, 0.9, 1));                            // 手
       this.arms[s] = { shoulder, elbow };
     }
-    // ---- 脚 (股関節球 → 大腿 → 膝球 → 下腿 → 足) : 股関節球が骨盤に埋まり腰と連結 ----
+    // ---- 脚ジョイント (豆なので見た目は無し。アニメ用の空グループのみ) ----
     this.legs = {};
     for (const s of [-1, 1]) {
       const hip = new THREE.Group(); hip.position.set(s * 0.1, -0.06, 0); this.pelvis.add(hip);
-      hip.add(ball(0.095, dark, 0));                                      // 股関節 (骨盤と重なる)
-      hip.add(capsule(0.075, 0.22, dark, -0.2));                          // 大腿
       const knee = new THREE.Group(); knee.position.y = -0.42; hip.add(knee);
-      knee.add(ball(0.068, dark, 0));                                     // 膝
-      knee.add(capsule(0.06, 0.2, dark, -0.19));                          // 下腿
-      const foot = ball(0.085, 0x333344, -0.42, 1.1, 0.62, 1.9); foot.position.z = 0.05; knee.add(foot);
       this.legs[s] = { hip, knee };
     }
 
     // ---- 銃 (鬼のときだけ表示) ----
     this.gun = new THREE.Group();
-    const gunBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.2, 3, 8), mat(0x333340));
-    gunBody.rotation.x = Math.PI / 2; gunBody.position.z = 0.12;
-    const gunGrip = capsule(0.028, 0.07, 0x554433, -0.07);
+    const gunBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.16, 3, 8), mat(0x333340));
+    gunBody.rotation.x = Math.PI / 2; gunBody.position.z = 0.1;
+    const gunGrip = capsule(0.024, 0.06, 0x554433, -0.06);
     this.gun.add(gunBody, gunGrip);
-    this.gun.position.set(0, -0.3, 0.05);
+    this.gun.position.set(0, -0.05, 0.06);
     this.gun.visible = false;
     this.arms[1].elbow.add(this.gun);
 
     // ---- 鬼マーカー (頭上の角) と役割リング ----
-    this.horn = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.16, 6), new THREE.MeshStandardMaterial({ color: 0xff3333, emissive: 0x881111 }));
-    this.horn.position.y = 0.37; this.horn.visible = false; this.neck.add(this.horn);
+    this.horn = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.14, 6), new THREE.MeshStandardMaterial({ color: 0xff3333, emissive: 0x881111 }));
+    this.horn.position.set(0.13, 0.14, 0); this.horn.rotation.z = -0.3; this.horn.visible = false; this.neck.add(this.horn);
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.34, 0.46, 24), new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
     this.ring.rotation.x = -Math.PI / 2; this.ring.position.y = 0.03; this.ring.visible = false;
     this.root.add(this.ring);
 
     // ---- 氷 (凍結時) ----
-    this.ice = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.85, 0.7), new THREE.MeshStandardMaterial({ color: 0x88ccff, transparent: true, opacity: 0.42, roughness: 0.1, metalness: 0.3 }));
-    this.ice.position.y = 0.92; this.ice.visible = false; this.root.add(this.ice);
+    this.ice = new THREE.Mesh(new THREE.BoxGeometry(0.82, 1.7, 0.82), new THREE.MeshStandardMaterial({ color: 0x88ccff, transparent: true, opacity: 0.42, roughness: 0.1, metalness: 0.3 }));
+    this.ice.position.y = 0.82; this.ice.visible = false; this.root.add(this.ice);
 
     // ---- 名札 ----
     if (name) this.setName(name);
@@ -129,8 +134,8 @@ export class Humanoid {
     ctx.fillStyle = '#fff'; ctx.fillText(name, 128, 34);
     const tex = new THREE.CanvasTexture(cv);
     this.tag = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-    this.tag.scale.set(1.5, 0.375, 1);
-    this.tag.position.y = 2.15;
+    this.tag.scale.set(2.7, 0.675, 1);      // rootが0.5倍なので見かけ上は約1.35幅
+    this.tag.position.y = 4.1;               // rootスケール後 world≈2.05
     this.root.add(this.tag);
   }
 
@@ -155,23 +160,23 @@ export class Humanoid {
     const onChest = Math.random() < 0.65;
     const parent = onChest ? this.chestG : this.pelvis;
     const splat = new THREE.Mesh(
-      new THREE.SphereGeometry(0.055 + Math.random() * 0.045, 10, 8),
+      new THREE.SphereGeometry(0.06 + Math.random() * 0.05, 10, 8),
       new THREE.MeshStandardMaterial({ color, roughness: 0.35, emissive: color, emissiveIntensity: 0.25 })
     );
-    splat.scale.set(1, 0.85 + Math.random() * 0.4, 0.32); // 平たい飛沫
+    splat.scale.set(1, 0.85 + Math.random() * 0.4, 0.3); // 平たい飛沫
     splat.position.set(
-      (Math.random() - 0.5) * 0.22,
-      onChest ? 0.04 + Math.random() * 0.26 : -0.05 + Math.random() * 0.1,
-      front * (onChest ? 0.145 : 0.13)
+      (Math.random() - 0.5) * 0.28,
+      onChest ? -0.05 + Math.random() * 0.3 : -0.05 + Math.random() * 0.12,
+      front * 0.3
     );
     splat.rotation.z = Math.random() * Math.PI;
     parent.add(splat);
     this.paints.push(splat);
     // 小さな飛び散り
     for (let i = 0; i < 2; i++) {
-      const drop = new THREE.Mesh(new THREE.SphereGeometry(0.02 + Math.random() * 0.015, 6, 6), splat.material);
+      const drop = new THREE.Mesh(new THREE.SphereGeometry(0.022 + Math.random() * 0.016, 6, 6), splat.material);
       drop.scale.set(1, 1, 0.4);
-      drop.position.copy(splat.position).add(new THREE.Vector3((Math.random() - 0.5) * 0.16, (Math.random() - 0.5) * 0.16, 0));
+      drop.position.copy(splat.position).add(new THREE.Vector3((Math.random() - 0.5) * 0.18, (Math.random() - 0.5) * 0.18, 0));
       parent.add(drop);
       this.paints.push(drop);
     }
@@ -190,7 +195,7 @@ export class Humanoid {
     this.smoothedSpeed += (sp - this.smoothedSpeed) * Math.min(1, dt * 10);
     const s = this.smoothedSpeed;
     const runK = Math.min(1, s / 5.5);            // 0=静止 1=全力
-    this.phase += dt * (2.1 + s * 1.9);           // 歩幅と歩調の連動
+    this.phase += dt * (2.1 + s * 2.4);           // 歩幅と歩調の連動 (脚が無いので少し速めのバウンド)
     const P = this.phase;
     const A = this.arms, L = this.legs;
     const swing = Math.sin(P), swing2 = Math.sin(P * 2);
@@ -199,69 +204,57 @@ export class Humanoid {
     if (st.jailed) { this.poseJailed(dt); return; }
 
     if (!st.onGround) {
-      // ---- 空中: 上昇=手を上げ膝を抱える / 下降=手足を広げて構える ----
+      // ---- 空中: ちょっと縦に伸びて手を上げる ----
       const up = THREE.MathUtils.clamp(st.velY / 6, -1, 1);
       this.body.position.y = 0;
-      this.pelvis.rotation.set(0.12 - up * 0.1, 0, 0);
-      this.spine.rotation.set(-0.15 + up * 0.1, 0, 0);
-      L[-1].hip.rotation.x = -0.9 + up * 0.4; L[-1].knee.rotation.x = 1.3;
-      L[1].hip.rotation.x = -0.35 + up * 0.2; L[1].knee.rotation.x = 0.75;
-      A[-1].shoulder.rotation.set(-2.2 + up * 0.5, 0, -0.35);
-      A[1].shoulder.rotation.set(-2.2 + up * 0.5, 0, 0.35);
-      A[-1].elbow.rotation.x = -0.45; A[1].elbow.rotation.x = -0.45;
-      this.neck.rotation.x = -0.1;
+      this.pelvis.rotation.set(0.05 - up * 0.06, 0, 0);
+      this.spine.rotation.set(-0.05 + up * 0.05, 0, 0);
+      A[-1].shoulder.rotation.set(-1.6 + up * 0.5, 0, -0.4);
+      A[1].shoulder.rotation.set(-1.6 + up * 0.5, 0, 0.4);
+      A[-1].elbow.rotation.x = -0.2; A[1].elbow.rotation.x = -0.2;
+      this.neck.rotation.set(-0.05, 0, 0);
     } else if (s > 0.25) {
-      // ---- 歩行/走行サイクル ----
-      const stride = 0.55 + runK * 0.55;          // 脚の振り幅
-      const lift = 0.35 + runK * 0.75;            // 膝の持ち上げ
-      // 脚: 前へ振る脚は膝が伸び、後ろへ戻る脚は膝が曲がる
+      // ---- 移動: 体を前傾させ左右にプリッと弾む (脚なしの豆歩き) ----
       for (const side of [-1, 1]) {
         const ph = P + (side === 1 ? Math.PI : 0);
-        const sw = Math.sin(ph);
-        L[side].hip.rotation.x = -sw * stride;
-        L[side].knee.rotation.x = Math.max(0, Math.sin(ph - 1.3)) * lift + 0.08;
-        // 腕は反対の脚と同期 + 肘は前で曲がる
         const asw = Math.sin(ph + Math.PI);
-        A[side].shoulder.rotation.x = asw * (0.45 + runK * 0.65);
-        A[side].shoulder.rotation.z = side * (0.06 + runK * 0.1);
-        A[side].elbow.rotation.x = -0.35 - runK * 0.75 - Math.max(0, -asw) * 0.4;
+        A[side].shoulder.rotation.x = asw * (0.35 + runK * 0.55);
+        A[side].shoulder.rotation.z = side * (0.2 + runK * 0.15);
+        A[side].elbow.rotation.x = -0.2 - runK * 0.3;
       }
-      // 骨盤: 上下バウンド(2倍周期)・左右体重移動・ヨー回旋
-      this.body.position.y = Math.abs(swing2) * (0.02 + runK * 0.05) - runK * 0.03;
-      this.pelvis.rotation.z = swing * (0.04 + runK * 0.04);
-      this.pelvis.rotation.y = swing * (0.08 + runK * 0.1);
-      this.pelvis.rotation.x = 0.04 + runK * 0.22;               // 前傾
-      this.spine.rotation.y = -swing * (0.1 + runK * 0.14);       // 体幹の逆ひねり
-      this.spine.rotation.z = -swing * 0.03;
-      this.spine.rotation.x = runK * 0.1;
-      this.neck.rotation.x = -0.08 - runK * 0.18;                 // 顔は前へ
-      this.neck.rotation.y = swing * 0.05;
+      // 体: 上下バウンド(2倍周期) + 左右の傾き + ヨー回旋 + 前傾
+      this.body.position.y = Math.abs(swing2) * (0.05 + runK * 0.09);
+      this.pelvis.rotation.z = swing * (0.1 + runK * 0.12);
+      this.pelvis.rotation.y = swing * (0.06 + runK * 0.08);
+      this.pelvis.rotation.x = 0.06 + runK * 0.28;               // 前傾
+      this.spine.rotation.y = -swing * (0.06 + runK * 0.1);
+      this.spine.rotation.z = -swing * 0.05;
+      this.spine.rotation.x = runK * 0.08;
+      this.neck.rotation.x = -0.04 - runK * 0.1;
+      this.neck.rotation.z = swing * 0.12;                        // 芽がぷるぷる揺れる
     } else {
-      // ---- アイドル: 呼吸・重心の微揺れ・キョロキョロ ----
+      // ---- アイドル: 呼吸・キョロキョロ・芽の揺れ ----
       const br = Math.sin(this.breath * 1.9);
-      this.body.position.y = br * 0.008;
-      this.pelvis.rotation.set(0.02, 0, Math.sin(this.breath * 0.7) * 0.015);
-      this.spine.rotation.set(br * 0.02, 0, 0);
-      this.chestG.rotation.x = br * 0.015;
-      this.neck.rotation.x = br * 0.012;
-      this.neck.rotation.y = Math.sin(this.breath * 0.35) * 0.3;
+      this.body.position.y = br * 0.02;
+      this.pelvis.rotation.set(0.02, 0, Math.sin(this.breath * 0.7) * 0.03);
+      this.spine.rotation.set(br * 0.03, 0, 0);
+      this.chestG.rotation.set(br * 0.02, 0, 0);
+      this.neck.rotation.set(br * 0.02, Math.sin(this.breath * 0.35) * 0.35, Math.sin(this.breath * 0.9) * 0.05);
       for (const side of [-1, 1]) {
-        A[side].shoulder.rotation.x = br * 0.03;
-        A[side].shoulder.rotation.z = side * 0.07;
-        A[side].elbow.rotation.x = -0.15 + br * 0.02;
-        L[side].hip.rotation.x = -0.03;
-        L[side].knee.rotation.x = 0.06;
+        A[side].shoulder.rotation.set(br * 0.04, 0, side * (0.25 + br * 0.03));
+        A[side].elbow.rotation.x = -0.12 + br * 0.02;
       }
     }
 
-    // ---- 着地の衝撃吸収 (しゃがみ→復帰) ----
+    // ---- 着地の衝撃吸収 (ぺちゃんこ→復帰) ----
     if (this.landT < 0.28 && st.onGround) {
       const t = this.landT / 0.28;
-      const dip = Math.sin((1 - t) * Math.PI * 0.5) * 0.16;
+      const dip = Math.sin((1 - t) * Math.PI * 0.5) * 0.14;
       this.body.position.y -= dip;
-      L[-1].knee.rotation.x += dip * 4; L[1].knee.rotation.x += dip * 4;
-      L[-1].hip.rotation.x -= dip * 2; L[1].hip.rotation.x -= dip * 2;
-      this.spine.rotation.x += dip * 1.2;
+      this.body.scale.set(1 + dip * 0.9, 1 - dip * 1.1, 1 + dip * 0.9); // 潰れる
+      this.spine.rotation.x += dip * 0.6;
+    } else {
+      this.body.scale.set(1, 1, 1);
     }
 
     // ---- 射撃/構え: 右腕を正面へ + 反動 ----
@@ -270,7 +263,7 @@ export class Humanoid {
       A[1].shoulder.rotation.x = -Math.PI / 2 + 0.1 + recoil * 0.6;
       A[1].shoulder.rotation.z = 0.1;
       A[1].elbow.rotation.x = -0.12 - recoil * 0.5;
-      this.chestG.rotation.y = -0.25;
+      this.chestG.rotation.y = -0.2;
     } else {
       this.chestG.rotation.y *= 1 - Math.min(1, st.dt * 8);
     }
@@ -283,28 +276,25 @@ export class Humanoid {
   }
 
   poseFrozen() {
-    const A = this.arms, L = this.legs;
-    this.body.position.y = -0.02;
+    const A = this.arms;
+    this.body.position.y = -0.02; this.body.scale.set(1, 1, 1);
     this.pelvis.rotation.set(0.05, 0, 0);
-    this.spine.rotation.set(0.1, 0, 0);
-    A[-1].shoulder.rotation.set(-0.5, 0, -0.5); A[1].shoulder.rotation.set(-0.5, 0, 0.5);
-    A[-1].elbow.rotation.x = -1.4; A[1].elbow.rotation.x = -1.4;
-    L[-1].hip.rotation.x = -0.1; L[1].hip.rotation.x = -0.1;
-    L[-1].knee.rotation.x = 0.15; L[1].knee.rotation.x = 0.15;
-    this.neck.rotation.set(0.15, 0, 0);
+    this.spine.rotation.set(0.06, 0, 0);
+    this.neck.rotation.set(0.1, 0, 0);
+    A[-1].shoulder.rotation.set(-0.4, 0, -0.6); A[1].shoulder.rotation.set(-0.4, 0, 0.6);
+    A[-1].elbow.rotation.x = -0.6; A[1].elbow.rotation.x = -0.6;
   }
 
   poseJailed(dt) {
-    // うなだれて腕組み
+    // うなだれてしょんぼり
     const br = Math.sin(this.breath * 1.4);
-    this.body.position.y = br * 0.006;
-    this.spine.rotation.set(0.22, 0, 0);
-    this.neck.rotation.set(0.35, br * 0.05, 0);
-    const A = this.arms, L = this.legs;
-    A[-1].shoulder.rotation.set(-0.7, 0.5, -0.25); A[1].shoulder.rotation.set(-0.7, -0.5, 0.25);
-    A[-1].elbow.rotation.x = -1.7; A[1].elbow.rotation.x = -1.7;
-    L[-1].hip.rotation.x = -0.05; L[1].hip.rotation.x = -0.05;
-    L[-1].knee.rotation.x = 0.1; L[1].knee.rotation.x = 0.1;
+    this.body.position.y = -0.04 + br * 0.01; this.body.scale.set(1, 1, 1);
+    this.pelvis.rotation.set(0.12, 0, 0);
+    this.spine.rotation.set(0.14, 0, 0);
+    this.neck.rotation.set(0.4, br * 0.06, 0);
+    const A = this.arms;
+    A[-1].shoulder.rotation.set(-0.2, 0, -0.35); A[1].shoulder.rotation.set(-0.2, 0, 0.35);
+    A[-1].elbow.rotation.x = -0.4; A[1].elbow.rotation.x = -0.4;
   }
 
   dispose() {
