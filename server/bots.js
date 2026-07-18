@@ -1,17 +1,16 @@
 // ============================================================
 // CPU対戦のボットAI
 // CPUレートが上がるほど「個体値」ではなく挙動・思考が良くなる:
-//   反応速度 / 経路探索の有無と頻度 / 偏差撃ち / 逃げ先の吟味 /
+//   反応速度 / 経路探索の有無と頻度 / 先回り / 逃げ先の吟味 /
 //   仲間の救出判断 / 牢屋の見張り / スタック復帰 など
+// 捕獲は体の接触 (サーバー側で自動判定) なので、鬼はとにかく距離を詰める。
 // ============================================================
 import { moveCapsule } from '../public/shared/collision.js';
-import { losBlocked } from './nav.js';
 
 const GRAVITY = -14.5;
 const JUMP_V = 5.6;
 const SPEED_RUN = 5.3;
 const SPEED_ONI = 5.75;
-const SHOT_RANGE = 1.9;
 
 // CPUレート → 難易度レベル (0〜5)
 export function cpuLevelOf(rating) {
@@ -29,12 +28,12 @@ export function botName(i) { return '🤖' + BOT_NAMES[i % BOT_NAMES.length]; }
 
 // レベル別パラメータ: 速度は全レベル同じ。賢さだけが変わる。
 const PARAMS = [
-  { react: 900, usePath: false, repath: 2200, predict: 0,    aimErr: 0.5,  shootDelay: 700, fleeDist: 7,  rescue: false, boldness: 0,  guardJail: false, idleP: 0.55 },
-  { react: 650, usePath: true,  repath: 1800, predict: 0,    aimErr: 0.34, shootDelay: 500, fleeDist: 9,  rescue: false, boldness: 0,  guardJail: false, idleP: 0.40 },
-  { react: 450, usePath: true,  repath: 1300, predict: 0.15, aimErr: 0.22, shootDelay: 350, fleeDist: 11, rescue: true,  boldness: 9,  guardJail: false, idleP: 0.28 },
-  { react: 300, usePath: true,  repath: 1000, predict: 0.3,  aimErr: 0.12, shootDelay: 220, fleeDist: 13, rescue: true,  boldness: 11, guardJail: true,  idleP: 0.18 },
-  { react: 190, usePath: true,  repath: 750,  predict: 0.45, aimErr: 0.06, shootDelay: 130, fleeDist: 16, rescue: true,  boldness: 14, guardJail: true,  idleP: 0.10 },
-  { react: 120, usePath: true,  repath: 550,  predict: 0.6,  aimErr: 0.02, shootDelay: 60,  fleeDist: 19, rescue: true,  boldness: 17, guardJail: true,  idleP: 0.05 },
+  { react: 900, usePath: false, repath: 2200, predict: 0,    fleeDist: 7,  rescue: false, boldness: 0,  guardJail: false, idleP: 0.55 },
+  { react: 650, usePath: true,  repath: 1800, predict: 0,    fleeDist: 9,  rescue: false, boldness: 0,  guardJail: false, idleP: 0.40 },
+  { react: 450, usePath: true,  repath: 1300, predict: 0.15, fleeDist: 11, rescue: true,  boldness: 9,  guardJail: false, idleP: 0.28 },
+  { react: 300, usePath: true,  repath: 1000, predict: 0.3,  fleeDist: 13, rescue: true,  boldness: 11, guardJail: true,  idleP: 0.18 },
+  { react: 190, usePath: true,  repath: 750,  predict: 0.45, fleeDist: 16, rescue: true,  boldness: 14, guardJail: true,  idleP: 0.10 },
+  { react: 120, usePath: true,  repath: 550,  predict: 0.6,  fleeDist: 19, rescue: true,  boldness: 17, guardJail: true,  idleP: 0.05 },
 ];
 
 export class BotBrain {
@@ -56,8 +55,6 @@ export class BotBrain {
     this.nextRepath = 0;
     this.mode = 'idle';
     this.targetId = null;
-    this.shootReadyAt = 0;
-    this.inRangeSince = 0;
     this.stuckT = 0;
     this.lastPos = { x: this.pos.x, z: this.pos.z };
     this.lastProbe = 0;
@@ -219,7 +216,7 @@ export class BotBrain {
       this.think(now);
     }
 
-    // ---- 追跡対象が近いときは経路より直接追う (+偏差) ----
+    // ---- 追跡対象が近いときは経路より直接追う (接触すればサーバーが捕獲判定) ----
     let steer = null;
     const isOni = gp.role === 'oni';
     const locked = isOni && now < g.graceUntil;
@@ -229,24 +226,6 @@ export class BotBrain {
         const d = Math.hypot(t.pos[0] - this.pos.x, t.pos[2] - this.pos.z);
         if (d < 5 && Math.abs(t.pos[1] - this.pos.y) < 1.6) {
           steer = { x: t.pos[0], z: t.pos[2] };
-        }
-        // ---- 射撃判定 ----
-        if (isOni && !locked && d < SHOT_RANGE * 0.92 && Math.abs(t.pos[1] - this.pos.y) < 1.3) {
-          if (!this.inRangeSince) { this.inRangeSince = now; this.shootReadyAt = now + P.shootDelay; }
-          const o = [this.pos.x, this.pos.y + 1.25, this.pos.z];
-          const tgt = [t.pos[0], t.pos[1] + 0.9, t.pos[2]];
-          if (now >= this.shootReadyAt && now - gp.lastShot > 950 && !losBlocked(o, tgt, this.solids)) {
-            let dir = [tgt[0] - o[0], tgt[1] - o[1], tgt[2] - o[2]];
-            const dl = Math.hypot(...dir) || 1;
-            dir = dir.map(v => v / dl);
-            // 狙いの誤差 (低レベルほど外す)
-            const err = P.aimErr * (Math.random() * 2 - 1);
-            const cos = Math.cos(err), sin = Math.sin(err);
-            dir = [dir[0] * cos - dir[2] * sin, dir[1], dir[0] * sin + dir[2] * cos];
-            room.onShoot(room.members.get(this.id), { p: o, d: dir });
-          }
-        } else {
-          this.inRangeSince = 0;
         }
       }
     }

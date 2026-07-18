@@ -133,10 +133,9 @@ input, select { font-family: inherit; }
 #right-zone { position: absolute; right: 0; top: 0; width: 50%; height: 100%; touch-action: none; }
 #stick-base { position: absolute; width: 120px; height: 120px; border-radius: 50%; background: #ffffff14; border: 2px solid #ffffff30; transform: translate(-50%, -50%); }
 #stick-knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; border-radius: 50%; background: #ffffff55; border: 2px solid #ffffff88; transform: translate(-50%, -50%); }
-#btn-shoot { position: absolute; right: max(22px, env(safe-area-inset-right)); bottom: max(26px, env(safe-area-inset-bottom)); width: 92px; height: 92px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #ff8866, #cc2244); color: #fff; font-size: 17px; font-weight: 900; box-shadow: 0 4px 18px #cc224488; z-index: 10; touch-action: none; }
-#btn-shoot:active { transform: scale(.92); }
-#btn-shoot.cd { filter: grayscale(.8); }
-#btn-dash { position: absolute; right: max(126px, calc(env(safe-area-inset-right) + 104px)); bottom: max(26px, env(safe-area-inset-bottom)); width: 72px; height: 72px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #7fd0ff, #2266cc); color: #fff; font-size: 26px; box-shadow: 0 4px 16px #2266cc88; z-index: 10; touch-action: none; }
+#btn-view { position: absolute; right: max(10px, env(safe-area-inset-right)); top: max(8px, env(safe-area-inset-top)); background: #000a; border: 1px solid #ffffff33; color: #fff; font-size: 13px; font-weight: 700; padding: 8px 12px; border-radius: 12px; z-index: 10; touch-action: none; }
+#btn-view:active { transform: scale(.95); }
+#btn-dash { position: absolute; right: max(22px, env(safe-area-inset-right)); bottom: max(26px, env(safe-area-inset-bottom)); width: 84px; height: 84px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #7fd0ff, #2266cc); color: #fff; font-size: 30px; box-shadow: 0 4px 16px #2266cc88; z-index: 10; touch-action: none; }
 #btn-dash:active { transform: scale(.92); }
 .jump-hint { position: absolute; right: 16px; bottom: 140px; color: #ffffff77; font-size: 12px; pointer-events: none; }
 #stamina-wrap { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(16px, env(safe-area-inset-bottom)); width: min(240px, 40%); height: 8px; background: #00000088; border-radius: 999px; overflow: hidden; border: 1px solid #ffffff2a; }

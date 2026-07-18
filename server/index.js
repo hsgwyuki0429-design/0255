@@ -27,9 +27,8 @@ const PORT = process.env.PORT || 3000;
 // ---------------- 定数 ----------------
 const MODES = { doro: '泥警', koori: '氷鬼', kawari: '代わり鬼' };
 const MAX_PLAYERS = 10;
-const SHOT_RANGE = 1.9;      // 銃の射程 ≒ 1m級の超短射程 (少し余裕を持たせる)
-const SHOT_HIT_RADIUS = 0.62;
-const SHOT_COOLDOWN = 900;   // ms
+const CATCH_RANGE = 1.0;     // 鬼の捕獲判定: 体の中心同士がこの距離まで近づいたらタッチ
+const CATCH_DY = 1.4;        // 捕獲判定の高さ許容 (段差ずれ)
 const TOUCH_RANGE = 1.7;     // 救出/氷解除の接触距離
 const GRACE_MS = 5000;       // 開始時に鬼が動けない猶予
 const SWAP_IMMUNE_MS = 3000; // 代わり鬼: タッチバック禁止時間
@@ -175,7 +174,7 @@ class Room {
         : map.spawns.run[ri++ % map.spawns.run.length];
       g.players.set(id, {
         id, role, pos: [...sp], ry: 0, anim: 0,
-        jailed: false, frozen: false, lastShot: 0, immuneUntil: 0,
+        jailed: false, frozen: false, immuneUntil: 0,
         stats: { tags: 0, rescues: 0, caughtCount: 0, oniTime: 0, lastBecameOni: role === 'oni' ? Date.now() : 0 }
       });
     }
@@ -207,8 +206,9 @@ class Room {
         }
       }, 50);
     }
-    // スナップショット配信 (15Hz) とルール監視 (2Hz)
+    // スナップショット配信 (15Hz) + 接触捕獲チェック とルール監視 (2Hz)
     this.snapIv = setInterval(() => {
+      this.checkCatches();
       const ps = {};
       for (const [id, p] of g.players) ps[id] = [+p.pos[0].toFixed(2), +p.pos[1].toFixed(2), +p.pos[2].toFixed(2), +p.ry.toFixed(2), p.anim];
       io.to(this.id).emit('snap', { t: Date.now(), ps });
@@ -246,31 +246,24 @@ class Room {
     gp.anim = data.s | 0;
   }
 
-  onShoot(p, data) {
+  // 鬼と逃げの体が触れたら捕獲 (銃は廃止 → シンプルな鬼ごっこのタッチ)
+  checkCatches() {
     const g = this.game; if (!g || g.over) return;
-    const gp = g.players.get(p.id); if (!gp || gp.role !== 'oni') return;
-    if (gp.jailed || gp.frozen) return;
     const now = Date.now();
     if (now < g.graceUntil) return;
-    if (now - gp.lastShot < SHOT_COOLDOWN) return;
-    gp.lastShot = now;
-    const o = (Array.isArray(data.p) && data.p.length === 3) ? data.p : gp.pos;
-    let d = (Array.isArray(data.d) && data.d.length === 3) ? data.d : [0, 0, 1];
-    const dl = Math.hypot(...d) || 1; d = d.map(v => v / dl);
-    io.to(this.id).emit('ev', { type: 'shot', id: p.id, p: o, d });
-    // ヒット判定: 射線からの距離 (超短射程)
-    let best = null, bestT = Infinity;
-    for (const [tid, tp] of g.players) {
-      if (tid === p.id || tp.role !== 'run' || tp.jailed || tp.frozen) continue;
-      if (now < tp.immuneUntil) continue;
-      const c = [tp.pos[0] - o[0], tp.pos[1] + 0.9 - o[1], tp.pos[2] - o[2]]; // 胴体中心へ
-      const t = c[0] * d[0] + c[1] * d[1] + c[2] * d[2];
-      if (t < 0 || t > SHOT_RANGE) continue;
-      const px = o[0] + d[0] * t, py = o[1] + d[1] * t, pz = o[2] + d[2] * t;
-      const dist = Math.hypot(tp.pos[0] - px, tp.pos[1] + 0.9 - py, tp.pos[2] - pz);
-      if (dist < SHOT_HIT_RADIUS && t < bestT) { best = tp; bestT = t; }
+    for (const oni of g.players.values()) {
+      if (oni.role !== 'oni' || oni.jailed || oni.frozen) continue;
+      for (const tp of g.players.values()) {
+        if (tp.id === oni.id || tp.role !== 'run' || tp.jailed || tp.frozen) continue;
+        if (now < tp.immuneUntil) continue;
+        const dx = tp.pos[0] - oni.pos[0], dz = tp.pos[2] - oni.pos[2];
+        const dy = Math.abs(tp.pos[1] - oni.pos[1]);
+        if (dx * dx + dz * dz < CATCH_RANGE * CATCH_RANGE && dy < CATCH_DY) {
+          this.onHit(oni, tp);
+          return; // 役割が変わる可能性があるので1回のtickで1捕獲まで
+        }
+      }
     }
-    if (best) this.onHit(gp, best);
   }
 
   onHit(oni, target) {
@@ -534,10 +527,6 @@ io.on('connection', (socket) => {
   socket.on('state', (data) => {
     const r = me?.roomId && rooms.get(me.roomId);
     if (r?.game) r.onState(me, data || {});
-  });
-  socket.on('shoot', (data) => {
-    const r = me?.roomId && rooms.get(me.roomId);
-    if (r?.game) r.onShoot(me, data || {});
   });
   socket.on('touchPlayer', (data) => {
     const r = me?.roomId && rooms.get(me.roomId);

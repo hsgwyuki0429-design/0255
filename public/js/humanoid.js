@@ -89,16 +89,6 @@ export class Humanoid {
       this.legs[s] = { hip, knee };
     }
 
-    // ---- 銃 (鬼のときだけ表示) ----
-    this.gun = new THREE.Group();
-    const gunBody = new THREE.Mesh(new THREE.CapsuleGeometry(0.03, 0.16, 3, 8), mat(0x333340));
-    gunBody.rotation.x = Math.PI / 2; gunBody.position.z = 0.1;
-    const gunGrip = capsule(0.024, 0.06, 0x554433, -0.06);
-    this.gun.add(gunBody, gunGrip);
-    this.gun.position.set(0, -0.05, 0.06);
-    this.gun.visible = false;
-    this.arms[1].elbow.add(this.gun);
-
     // ---- 鬼マーカー (頭上の角) と役割リング ----
     this.horn = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.14, 6), new THREE.MeshStandardMaterial({ color: 0xff3333, emissive: 0x881111 }));
     this.horn.position.set(0.13, 0.14, 0); this.horn.rotation.z = -0.3; this.horn.visible = false; this.neck.add(this.horn);
@@ -117,7 +107,6 @@ export class Humanoid {
     this.phase = 0;       // 歩行サイクル位相
     this.breath = Math.random() * 6;
     this.landT = 0;       // 着地からの経過
-    this.shootT = 1;      // 射撃からの経過
     this.smoothedSpeed = 0;
     this.wasGround = true;
     this.leanF = 0; this.leanS = 0;
@@ -141,15 +130,12 @@ export class Humanoid {
 
   setRole(role) {
     const oni = role === 'oni';
-    this.gun.visible = oni;
     this.horn.visible = oni;
     this.ring.visible = oni;
   }
   setFrozen(f) { this.ice.visible = f; }
 
-  triggerShoot() { this.shootT = 0; }
-
-  // ペイント弾の被弾痕: 体にインクの飛沫を貼り付ける
+  // タッチされた痕: 体にインクの飛沫を貼り付ける
   addPaint(color) {
     if (this.paints.length >= 10) {
       const old = this.paints.shift();
@@ -182,11 +168,10 @@ export class Humanoid {
     }
   }
 
-  // state: {speed(m/s), velY, onGround, moving, aiming, frozen, jailed, dt}
+  // state: {speed(m/s), velY, onGround, moving, frozen, jailed, dt}
   update(st) {
     const dt = Math.min(st.dt, 0.05);
     this.breath += dt;
-    this.shootT += dt;
     this.landT += dt;
     if (st.onGround && !this.wasGround && st.velY <= 0) this.landT = 0; // 着地検出
     this.wasGround = st.onGround;
@@ -257,16 +242,7 @@ export class Humanoid {
       this.body.scale.set(1, 1, 1);
     }
 
-    // ---- 射撃/構え: 右腕を正面へ + 反動 ----
-    if (st.aiming || this.shootT < 0.35) {
-      const recoil = Math.max(0, 1 - this.shootT / 0.18) * 0.5;
-      A[1].shoulder.rotation.x = -Math.PI / 2 + 0.1 + recoil * 0.6;
-      A[1].shoulder.rotation.z = 0.1;
-      A[1].elbow.rotation.x = -0.12 - recoil * 0.5;
-      this.chestG.rotation.y = -0.2;
-    } else {
-      this.chestG.rotation.y *= 1 - Math.min(1, st.dt * 8);
-    }
+    this.chestG.rotation.y *= 1 - Math.min(1, st.dt * 8);
 
     // 鬼リングの脈動
     if (this.ring.visible) {

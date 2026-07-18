@@ -1,10 +1,9 @@
-// 入力: 左半分=仮想スティック / 右下=撃つボタン / 右半分タップ=ジャンプ / 右半分ドラッグ=カメラ
-// PC: WASD+Space+マウスドラッグ+クリック射撃
+// 入力: 左半分=仮想スティック / 右下=ダッシュボタン / 右半分タップ=ジャンプ / 右半分ドラッグ=カメラ
+// PC: WASD+Space+マウスドラッグ
 export class Input {
   constructor() {
     this.move = { x: 0, y: 0 };     // -1..1
     this.jumpQueued = false;
-    this.shootQueued = false;
     this.lookDX = 0; this.lookDY = 0;
     this.isTouch = 'ontouchstart' in window;
     this.keys = {};
@@ -24,7 +23,6 @@ export class Input {
     const rightZone = document.getElementById('right-zone');
     const base = document.getElementById('stick-base');
     const knob = document.getElementById('stick-knob');
-    const shootBtn = document.getElementById('btn-shoot');
 
     // ---- 左: 仮想スティック (触れた場所が原点になる動的スティック) ----
     stickZone.addEventListener('touchstart', e => {
@@ -97,14 +95,6 @@ export class Input {
     rightZone.addEventListener('touchend', lookEnd);
     rightZone.addEventListener('touchcancel', lookEnd);
 
-    // ---- 撃つボタン ----
-    shootBtn.addEventListener('touchstart', e => {
-      if (!this.enabled) return;
-      e.preventDefault(); e.stopPropagation();
-      this.shootQueued = true;
-    }, { passive: false });
-    shootBtn.addEventListener('mousedown', e => { if (this.enabled) { e.stopPropagation(); this.shootQueued = true; } });
-
     // ---- ダッシュボタン (モバイル: 押している間ダッシュ) ----
     const dashBtn = document.getElementById('btn-dash');
     if (dashBtn) {
@@ -137,13 +127,7 @@ export class Input {
       if (Math.abs(dx) + Math.abs(dy) > 1) this.lastLookT = performance.now();
       lastM = { x: e.clientX, y: e.clientY };
     });
-    window.addEventListener('mouseup', e => {
-      if (mouseDown && this.enabled && lastM && Math.hypot(e.clientX - lastM.x, e.clientY - lastM.y) < 4) {
-        // 短いクリック → 撃つ (鬼のとき)
-        this.shootQueued = true;
-      }
-      mouseDown = false;
-    });
+    window.addEventListener('mouseup', () => { mouseDown = false; });
   }
 
   // キーボードの移動を合成して返す
@@ -165,5 +149,4 @@ export class Input {
   }
   consumeJump() { const j = this.jumpQueued; this.jumpQueued = false; return j; }
   getSprint() { return !!(this.sprintTouch || this.keys['ShiftLeft'] || this.keys['ShiftRight']); }
-  consumeShoot() { const s = this.shootQueued; this.shootQueued = false; return s; }
 }
