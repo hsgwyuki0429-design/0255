@@ -1,13 +1,27 @@
 // WebAudio による全効果音のプロシージャル生成 (音声ファイル不要)
 let ctx = null;
 let master = null;
+const MASTER_VOL = 0.42;
+let muted = localStorage.getItem('oni-mute') === '1';
 
 export function initAudio() {
   if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
   ctx = new (window.AudioContext || window.webkitAudioContext)();
   master = ctx.createGain();
-  master.gain.value = 0.5;
-  master.connect(ctx.destination);
+  master.gain.value = muted ? 0 : MASTER_VOL;
+  // 矩形波の高次倍音がキンキン耳に刺さるのを防ぐローパス
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 5200;
+  master.connect(lp);
+  lp.connect(ctx.destination);
+}
+
+export function isMuted() { return muted; }
+export function setMuted(m) {
+  muted = !!m;
+  localStorage.setItem('oni-mute', muted ? '1' : '0');
+  if (master) master.gain.value = muted ? 0 : MASTER_VOL;
 }
 
 function now() { return ctx ? ctx.currentTime : 0; }
@@ -39,7 +53,7 @@ function noise(dur, vol = 0.3, freq = 1000, q = 1, when = 0) {
 }
 
 export const SFX = {
-  hit()        { tone(880, 0.1, 'square', 0.3, 440); noise(0.08, 0.3, 3000, 1); },
+  hit()        { tone(880, 0.1, 'square', 0.22, 440); noise(0.08, 0.22, 2400, 1); },
   jump()       { tone(240, 0.18, 'sine', 0.25, 480); },
   land()       { noise(0.1, 0.25, 300, 0.7); },
   step(alt)    { noise(0.045, 0.09, alt ? 700 : 550, 1.2); },
@@ -48,17 +62,17 @@ export const SFX = {
   frozen()     { [1800, 2400, 3000].forEach((f, i) => tone(f, 0.2, 'sine', 0.18, f * 0.8, i * 0.05)); noise(0.25, 0.15, 4000, 2); },
   unfrozen()   { [3000, 2200, 1500].forEach((f, i) => tone(f, 0.12, 'sine', 0.16, f * 1.2, i * 0.05)); },
   swapped()    { tone(200, 0.3, 'sawtooth', 0.3, 600); tone(600, 0.2, 'square', 0.2, 300, 0.2); },
-  countdown()  { tone(880, 0.12, 'square', 0.3); },
-  go()         { tone(1320, 0.4, 'square', 0.35); tone(1760, 0.3, 'square', 0.2, null, 0.05); },
-  tick()       { tone(1200, 0.05, 'square', 0.15); },
+  countdown()  { tone(660, 0.12, 'triangle', 0.3); },
+  go()         { tone(1046, 0.35, 'triangle', 0.35); tone(1568, 0.28, 'triangle', 0.2, null, 0.05); },
+  tick()       { tone(880, 0.05, 'triangle', 0.14); },
   win()        { [523, 659, 784, 1046, 1319].forEach((f, i) => tone(f, 0.25, 'triangle', 0.3, null, i * 0.12)); },
   lose()       { [400, 350, 300, 250].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.22, f * 0.9, i * 0.15)); },
   join()       { tone(660, 0.1, 'triangle', 0.2); tone(880, 0.1, 'triangle', 0.2, null, 0.08); },
   touch()      { tone(1046, 0.1, 'triangle', 0.25); tone(1319, 0.12, 'triangle', 0.22, null, 0.06); },
-  whistle()    { // 審判の笛: ピッ・ピィーッ (2枚重ねでうなりを出す)
-    tone(2350, 0.14, 'square', 0.16, 2450);
-    tone(2320, 0.14, 'sine', 0.12, 2420);
-    tone(2350, 0.55, 'square', 0.16, 2250, 0.22);
-    tone(2395, 0.55, 'sine', 0.12, 2295, 0.22);
+  whistle()    { // 審判の笛: ピッ・ピィーッ (音量控えめ・耳に刺さらない高さに調整)
+    tone(2350, 0.14, 'square', 0.09, 2450);
+    tone(2320, 0.14, 'sine', 0.07, 2420);
+    tone(2350, 0.5, 'square', 0.09, 2250, 0.22);
+    tone(2395, 0.5, 'sine', 0.07, 2295, 0.22);
   }
 };

@@ -222,6 +222,39 @@ function buildCave() {
     boxes.push(B(sx + 0.6, 0, sz - 0.4, 0.45, 1.1, 0.45, 0x51443a, 'stone', { deco: 1 }));
   }
 
+  // ---- 鍾乳石 (坑道の天井から垂れる: 当たりなし) ----
+  const stalac = [[0, -18], [-1, -24], [13, -1], [19, 1], [24, -17], [-13, 0], [-19, -2], [1, 14], [-1, 20], [-22, -30], [29, 14], [-27, 12], [-9, 29], [20, 23], [30, -12]];
+  for (const [sx, sz] of stalac) {
+    const h = 0.9 + (((sx * 5 + sz * 11) % 8) + 8) % 8 / 10;
+    boxes.push(B(sx, LH - h, sz, 0.5, h, 0.5, 0x4a3d30, 'stone', { deco: 1 }));
+    boxes.push(B(sx + 0.45, LH - 0.6, sz + 0.3, 0.28, 0.6, 0.28, 0x4a3d30, 'stone', { deco: 1 }));
+  }
+
+  // ---- 苔むした床 (湿った洞窟の緑: 当たりなし) ----
+  const moss = [[-8, -8], [7, -4], [-10, -34], [10, -30], [30, 7], [-38, 5], [0, 27], [14, 36], [16, -24], [-28, 17]];
+  for (const [mx, mz] of moss) {
+    boxes.push(B(mx, 0, mz, 1.6 + (((mx + mz) % 3) + 3) % 3 * 0.5, 0.05, 1.3, 0x3f6a4a, 'leaf', { deco: 1 }));
+    boxes.push(B(mx + 1.1, 0, mz - 0.8, 0.8, 0.04, 0.7, 0x4a7a55, 'leaf', { deco: 1 }));
+  }
+
+  // ---- たき火 (南の洞窟: 探検者の残した焚き火跡) ----
+  boxes.push(B(-3, 0, 33, 1.0, 0.22, 0.28, 0x5a4028, 'wood', { deco: 1 }));
+  boxes.push(B(-3, 0, 33, 0.28, 0.22, 1.0, 0x5a4028, 'wood', { deco: 1 }));
+  boxes.push(B(-3, 0.18, 33, 0.42, 0.55, 0.42, 0xffa030, 'crystal', { deco: 1, glow: 1 }));
+  boxes.push(B(-3, 0.6, 33, 0.2, 0.35, 0.2, 0xffd980, 'crystal', { deco: 1, glow: 1 }));
+
+  // ---- 骨の散らばり (南の洞窟のディテール) ----
+  boxes.push(B(2, 0, 30, 1.8, 0.3, 0.5, 0xd8cfc0, 'bone', { deco: 1 }));
+  boxes.push(B(6.5, 0, 36.5, 0.9, 0.65, 0.9, 0xe8e0d2, 'bone', { deco: 1 }));
+  boxes.push(B(17, 0, 33, 2.2, 0.35, 0.7, 0xd8cfc0, 'bone', { deco: 1 }));
+  boxes.push(B(-5.5, 0, 28, 0.5, 0.9, 0.5, 0xe8e0d2, 'bone', { deco: 1 }));
+
+  // ---- 地底湖の光る水草 ----
+  for (const [wx, wz] of [[31, -1], [36, 4], [33, 6], [-34, -2]]) {
+    boxes.push(B(wx, 0.15, wz, 0.28, 0.7, 0.28, 0x55e8c0, 'crystal', { deco: 1, glow: 1 }));
+    boxes.push(B(wx + 0.4, 0.15, wz - 0.3, 0.2, 0.45, 0.2, 0x55e8c0, 'crystal', { deco: 1, glow: 1 }));
+  }
+
   // ---- クリスタル (発光デコ) ----
   const crys = [
     [0, 0, -9.5, 0x66ffee], [-9, 0, 3, 0xbb88ff], [16, 0, 0, 0x88aaff], [-16, 0, 0, 0x66ffee],
@@ -498,6 +531,40 @@ function buildMall() {
   boxes.push(B(45, F2, -24, 1.4, 0.7, 1.4, 0x8a7a64, 'wood'));
   boxes.push(B(45, F2 + 0.7, -24, 0.9, 1.3, 0.9, 0x3f9b4f, 'leaf', { deco: 1 }));
 
+  // ============ 通路と館内のディテール (すべて当たりなし) ============
+  // 吊り下げフロアサイン (通路の頭上)
+  for (const sx of [-30, -10, 14, 32]) {
+    boxes.push(B(sx, 4.1, 0, 2.6, 0.7, 0.12, 0xf8f8f4, 'sign', { deco: 1, glow: 1 }));
+    boxes.push(B(sx, 4.8, 0, 0.08, 0.35, 0.08, 0x9aa2ac, 'metal', { deco: 1 }));
+  }
+  // フロア案内板 (噴水脇) と館内図
+  boxes.push(B(-3.5, 0, 4.5, 0.25, 1.7, 1.1, 0x2a3856, 'sign', { deco: 1, glow: 1 }));
+  // ガチャガチャコーナー (中央コート西縁)
+  const gachaCols = [0xff6b81, 0x54c2ff, 0xffd166, 0x8ce99a];
+  for (let i = 0; i < 4; i++) boxes.push(B(-7.4, 0, -9.5 + i * 1.1, 0.6, 1.3, 0.6, gachaCols[i], 'metal', { deco: 1, glow: 1 }));
+  // ATMコーナー (西の核の壁ぞい)
+  boxes.push(B(-33.4, 0, -5.4, 0.7, 1.7, 0.9, 0x3a6fd8, 'metal', { deco: 1, glow: 1 }));
+  boxes.push(B(-33.4, 0, -4.1, 0.7, 1.7, 0.9, 0xd83a5e, 'metal', { deco: 1, glow: 1 }));
+  // 観葉植物の列 (通路の潤い)
+  for (const [px, pz] of [[-14, -5.8], [-24, 5.8], [30, -5.8], [40, 5.8]]) {
+    boxes.push(B(px, 0, pz, 1.2, 0.55, 1.2, 0x8a7a64, 'wood', { deco: 1 }));
+    boxes.push(B(px, 0.55, pz, 0.8, 1.2, 0.8, 0x3f9b4f, 'leaf', { deco: 1 }));
+  }
+  // 噴水の水柱
+  boxes.push(B(2, 0.9, 0, 0.35, 1.7, 0.35, 0x9fdcf8, 'crystal', { deco: 1, glow: 1 }));
+  boxes.push(B(2, 2.4, 0, 0.7, 0.25, 0.7, 0x9fdcf8, 'crystal', { deco: 1, glow: 1 }));
+  // ショッピングカート置き場 (スーパー入口の壁ぞい)
+  for (let i = 0; i < 3; i++) boxes.push(B(-34.9, 0, -20.2 + i * 0.8, 0.8, 1.0, 0.7, 0xb8c4d0, 'metal', { deco: 1 }));
+  // 天窓の梁 (中央吹き抜けの上)
+  for (const bx of [-4, 2, 8]) boxes.push(B(bx, 10.6, 0, 0.4, 0.3, 30, 0xd8dde4, 'metal', { deco: 1 }));
+  // トイレのピクトサイン (通路奥へ誘導)
+  for (const s of [-1, 1]) {
+    boxes.push(B(1.5, 4.0, s * 15.6, 0.9, 0.6, 0.15, 0x3aa0e8, 'sign', { deco: 1, glow: 1 }));
+    boxes.push(B(4.5, 4.0, s * 15.6, 0.9, 0.6, 0.15, 0xe86a8a, 'sign', { deco: 1, glow: 1 }));
+  }
+  // フードコートのトレー返却台と紙ナプキン台
+  boxes.push(B(44.8, 0, -3.5, 1.2, 1.0, 0.8, 0x9c8f80, 'wood', { deco: 1 }));
+
   // ============ 牢屋: 1F北東バックヤードの警備室 ============
   // (スタッフ通路からドアで入る。壁は低めで外から中が見える)
   boxes.push(B(35, 0, -26, 3.5, 0.9, 1.0, 0x707a90, 'metal')); // 警備デスク
@@ -750,11 +817,71 @@ function buildSchool() {
   boxes.push(...wallZ(-16, -8, 42, 0, 3.2, 0.4, [[-13.5, -11]], 0x9a8a74));      // 西向きのドア
   boxes.push(B(45.5, 3.2, -12, 6.4, 0.3, 8.4, 0x8a8478, 'tile'));                // 倉庫の屋根
   boxes.push(B(46, 0, -14, 2.2, 1.2, 1.6, 0xc8a878, 'wood'));                    // ライン引き・用具
-  // 桜並木 (幹=当たりあり, 葉=デコ)
+  // 桜並木 (幹=当たりあり, 葉=デコ。花の色に個体差を付ける)
   for (const [tx, tz] of [[49, -30], [49, -22], [49, 20], [49, 30], [4, 37], [-14, 37], [26, 37], [-49, -20], [-49, 0], [-49, 10], [-42, -34], [40, -34]]) {
     boxes.push(B(tx, 0, tz, 0.7, 2.6, 0.7, 0x6a4a34, 'wood'));
-    boxes.push(B(tx, 2.4, tz, 3.4, 2.4, 3.4, 0xf0a8c0, 'leaf', { deco: 1 }));
+    boxes.push(B(tx, 2.4, tz, 3.4, 2.4, 3.4, ((tx + tz) & 1) ? 0xf7c1d4 : 0xf0a8c0, 'leaf', { deco: 1 }));
   }
+
+  // ============ 校舎と校庭のディテール (すべて当たりなし) ============
+  const GLASS = 0x9fc8e8;
+  for (let fl = 0; fl < FLOORS; fl++) {
+    const Y = fl * FH;
+    // 外壁の窓ガラス帯 (北面と両ウイング外側)
+    for (let wx = -30; wx <= 30; wx += 5) {
+      if (fl === 0 && wx === 0) continue; // 1F裏口
+      boxes.push(B(wx, Y + 1.2, -38.36, 2.6, 1.5, 0.18, GLASS, 'metal', { deco: 1 }));
+    }
+    for (let wz = -21; wz <= 5; wz += 4) {
+      boxes.push(B(-34.36, Y + 1.2, wz, 0.18, 1.5, 2.4, GLASS, 'metal', { deco: 1 }));
+      boxes.push(B(34.36, Y + 1.2, wz, 0.18, 1.5, 2.4, GLASS, 'metal', { deco: 1 }));
+    }
+    // 教室の黒板 (2F/3Fの各教室の北壁)
+    if (fl === 1 || fl === 2) {
+      for (const [x1, x2] of [[-22, -11], [-11, 0], [0, 11], [11, 22]]) {
+        boxes.push(B((x1 + x2) / 2, Y + 0.85, -37.55, 3.4, 1.15, 0.12, 0x2a5a44, 'metal', { deco: 1 }));
+      }
+    }
+    // 廊下の消火器と掲示板
+    boxes.push(B(-19.5, Y, -27.55, 0.22, 0.55, 0.22, 0xdd3333, 'metal', { deco: 1 }));
+    boxes.push(B(19.5, Y, -27.55, 0.22, 0.55, 0.22, 0xdd3333, 'metal', { deco: 1 }));
+    boxes.push(B(-6, Y + 1.1, -27.7, 3, 1.2, 0.1, 0x7a9a6a, 'wood', { deco: 1 }));
+    boxes.push(B(6, Y + 1.1, -27.7, 3, 1.2, 0.1, 0xc9b98a, 'wood', { deco: 1 }));
+  }
+  // 昇降口の下駄箱 (1F廊下・出入口の両脇)
+  for (const gx of [-16.5, -7.5, 7.5, 16.5]) boxes.push(B(gx, 0, -24.6, 2.4, 1.0, 0.5, 0x9a8a74, 'shelf', { deco: 1 }));
+  // 本棟南面の大時計 (中庭から見える)
+  boxes.push(B(0, FH * 3 + 1.6, -23.6, 1.5, 1.5, 0.15, 0xf6f6f0, 'metal', { deco: 1 }));
+  boxes.push(B(0, FH * 3 + 2.25, -23.55, 0.1, 0.55, 0.08, 0x22262c, 'metal', { deco: 1 }));
+  boxes.push(B(0.22, FH * 3 + 2.3, -23.55, 0.42, 0.1, 0.08, 0x22262c, 'metal', { deco: 1 }));
+  // 校門 (南フェンスの門柱と表札)
+  boxes.push(B(-2.6, 0, 39.6, 0.9, 2.0, 0.9, 0x8a8478, 'stone', { deco: 1 }));
+  boxes.push(B(2.6, 0, 39.6, 0.9, 2.0, 0.9, 0x8a8478, 'stone', { deco: 1 }));
+  boxes.push(B(0, 0, 39.6, 4.2, 1.5, 0.12, 0x6a7480, 'metal', { deco: 1 }));
+  boxes.push(B(3.4, 1.0, 39.15, 0.5, 0.9, 0.1, 0xe8e2d4, 'stone', { deco: 1 }));
+  // 国旗掲揚ポールと百葉箱
+  boxes.push(B(-11, 0, 24, 0.12, 7, 0.12, 0xb8c0c8, 'metal', { deco: 1 }));
+  boxes.push(B(-10.45, 6.1, 24, 1.0, 0.7, 0.06, 0xffffff, 'metal', { deco: 1 }));
+  boxes.push(B(-18, 0, 12, 0.7, 1.3, 0.7, 0xf4f4ee, 'wood', { deco: 1 }));
+  boxes.push(B(-18, 1.3, 12, 0.9, 0.15, 0.9, 0x8a8478, 'wood', { deco: 1 }));
+  // 体育館のバスケコートライン・得点板・肋木
+  const LINE = 0xf0ead8;
+  boxes.push(B(-34, 0.125, 16.5, 15, 0.012, 0.12, LINE, 'tile', { deco: 1 }));
+  boxes.push(B(-34, 0.125, 31.5, 15, 0.012, 0.12, LINE, 'tile', { deco: 1 }));
+  boxes.push(B(-26.5, 0.125, 24, 0.12, 0.012, 15, LINE, 'tile', { deco: 1 }));
+  boxes.push(B(-41.5, 0.125, 24, 0.12, 0.012, 15, LINE, 'tile', { deco: 1 }));
+  boxes.push(B(-34, 0.125, 24, 15, 0.012, 0.12, LINE, 'tile', { deco: 1 }));
+  boxes.push(B(-22.35, 4.5, 24, 0.15, 1.2, 2.6, 0x1e2a22, 'metal', { deco: 1 }));
+  boxes.push(B(-38, 0, 33.55, 2.2, 2.8, 0.15, 0xb08a54, 'wood', { deco: 1 }));
+  boxes.push(B(-31, 0, 33.55, 2.2, 2.8, 0.15, 0xb08a54, 'wood', { deco: 1 }));
+  // 校庭のサッカーゴールと白線
+  boxes.push(B(28.2, 0, 11, 0.15, 1.8, 0.15, 0xffffff, 'metal', { deco: 1 }));
+  boxes.push(B(31.8, 0, 11, 0.15, 1.8, 0.15, 0xffffff, 'metal', { deco: 1 }));
+  boxes.push(B(30, 1.8, 11, 3.75, 0.15, 0.15, 0xffffff, 'metal', { deco: 1 }));
+  boxes.push(B(12, 0.005, 12.4, 20, 0.02, 0.1, 0xe8e0cc, 'dirt', { deco: 1 }));
+  boxes.push(B(12, 0.005, 13.6, 20, 0.02, 0.1, 0xe8e0cc, 'dirt', { deco: 1 }));
+  // 自転車置き場の自転車
+  for (let i = 0; i < 3; i++) boxes.push(B(40 + i * 2.6, 0, 5, 1.6, 0.85, 0.14, [0xcc4455, 0x4477cc, 0x55aa66][i], 'metal', { deco: 1 }));
   return {
     id: 'school', name: '学校', boxes,
     sky: 0xffb37a, fog: { color: 0xffc490, near: 55, far: 185 },

@@ -118,7 +118,9 @@ export class NavGrid {
   }
 
   // A* 経路探索。戻り値: [{x,y,z,jump}] or null
-  findPath(sx, sy, sz, tx, ty, tz, maxIter = 24000) {
+  // maxIter: 学校の牢屋→4Fのような長い立体経路は24000では探索し切れず
+  // 「到達可能なのに迷子」になるため、実測(≈110ms)を基に余裕を持たせた値
+  findPath(sx, sy, sz, tx, ty, tz, maxIter = 64000) {
     const start = this.sample(sx, sy, sz), goal = this.sample(tx, ty, tz);
     if (!start || !goal) return null;
     const NZ = this.nz;

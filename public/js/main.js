@@ -10,7 +10,7 @@ import { buildWorld, clampCamera } from './world.js';
 import { moveCapsule } from '/shared/collision.js';
 import { Minimap } from './minimap.js';
 import { VFX } from './vfx.js';
-import { initAudio, SFX } from './sfx.js';
+import { initAudio, SFX, isMuted, setMuted } from './sfx.js';
 
 // ---------------- 基本状態 ----------------
 const $ = id => document.getElementById(id);
@@ -214,7 +214,8 @@ function initRenderer() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, input.isTouch ? 2 : 2));
   renderer.shadowMap.enabled = !input.isTouch;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  camera = new THREE.PerspectiveCamera(140, innerWidth / innerHeight, 0.1, 320); // 視野を従来(70)の2倍に
+  // FOV 78°: 140°は魚眼歪みで3D酔いの原因になるため、快適な標準視野に戻した
+  camera = new THREE.PerspectiveCamera(78, innerWidth / innerHeight, 0.1, 320);
   window.addEventListener('resize', () => {
     renderer.setSize(innerWidth, innerHeight);
     camera.aspect = innerWidth / innerHeight;
@@ -276,6 +277,8 @@ function startGame(data) {
 
   updateRoleHUD();
   updateCountHUD();
+  // 開始猶予の表示: 逃げは動けるのに「スタートまで」と出ると紛らわしいので役割別の文言に
+  $('grace-label').textContent = game.role === 'oni' ? '👹 鬼はまだ動けない…' : '🏃 今のうちに逃げろ! 鬼が動くまで';
   $('hud-msg').innerHTML = '';
   $('status-overlay').classList.add('hidden');
   $('touch-hint').classList.add('hidden');
@@ -311,6 +314,34 @@ function toggleView() {
   applyViewMode();
 }
 applyViewMode();
+
+// ---------------- ミュート切替 ----------------
+function applyMuteBtn() { $('btn-mute').textContent = isMuted() ? '🔇' : '🔊'; }
+function toggleMute() { setMuted(!isMuted()); applyMuteBtn(); }
+$('btn-mute').addEventListener('click', e => { e.stopPropagation(); toggleMute(); });
+$('btn-mute').addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); toggleMute(); }, { passive: false });
+applyMuteBtn();
+
+// ---------------- ゲーム中の退出 (誤タップ防止の2段階) ----------------
+let exitArmAt = 0;
+function resetExitBtn() { $('btn-exit').textContent = '🚪'; $('btn-exit').classList.remove('arm'); }
+function onExitTap() {
+  if (Date.now() - exitArmAt < 3000) {
+    net.leaveRoom();
+    currentRoom = null;
+    cleanupGame();
+    resetExitBtn();
+    show('screen-home');
+    refreshRooms();
+    return;
+  }
+  exitArmAt = Date.now();
+  $('btn-exit').textContent = 'もう一度タップで退出';
+  $('btn-exit').classList.add('arm');
+  setTimeout(() => { if (Date.now() - exitArmAt >= 2900) resetExitBtn(); }, 3000);
+}
+$('btn-exit').addEventListener('click', e => { e.stopPropagation(); onExitTap(); });
+$('btn-exit').addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); onExitTap(); }, { passive: false });
 function updateCountHUD() {
   if (!game) return;
   const rs = [...game.remotes.values()].filter(r => r.role === 'run');
@@ -430,11 +461,20 @@ net.on('ev', ev => {
   }
 });
 
+let statusMiniT = null;
 function showStatus(title, sub) {
-  $('status-overlay').innerHTML = `${title}<small>${sub}</small>`;
-  $('status-overlay').classList.remove('hidden');
+  const el = $('status-overlay');
+  el.innerHTML = `${title}<small>${sub}</small>`;
+  el.classList.remove('hidden', 'mini');
+  // 拘束が長引いても視界を塞ぎ続けないよう、数秒で小さなバナーに畳む
+  clearTimeout(statusMiniT);
+  statusMiniT = setTimeout(() => el.classList.add('mini'), 2800);
 }
-function hideStatus() { $('status-overlay').classList.add('hidden'); }
+function hideStatus() {
+  clearTimeout(statusMiniT);
+  $('status-overlay').classList.add('hidden');
+  $('status-overlay').classList.remove('mini');
+}
 function showStatusFlash(text) {
   showStatus(text, '');
   setTimeout(hideStatus, 1600);
