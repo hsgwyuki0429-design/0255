@@ -420,6 +420,11 @@ net.on('ev', ev => {
       updateCountHUD();
       break;
     }
+    case 'whistle': {
+      SFX.whistle();
+      hudMsg('📯 ピィーッ! 30秒間 誰も捕まっていない!', '#ffd166');
+      break;
+    }
     case 'joined': SFX.join(); break;
     case 'left': if (game) { const rr = game.remotes.get(ev.id); if (rr) { scene.remove(rr.hum.root); rr.hum.dispose(); game.remotes.delete(ev.id); hudMsg(`👋 ${ev.name} が退出`, '#aaa'); updateCountHUD(); } } break;
   }
@@ -593,6 +598,24 @@ function loop(t) {
   if (g.onGround && hSpeed > 1) {
     g.stepAcc += hSpeed * dt;
     if (g.stepAcc > 2.1) { g.stepAcc = 0; g.stepAlt = !g.stepAlt; SFX.step(g.stepAlt); }
+  }
+
+  // ---- 鬼の捕獲タッチ: 画面上で体が触れたら即サーバーへ申告 (権威判定はサーバー) ----
+  // 相手の表示は補間で少し過去のため、サーバー自動判定だけだと「見た目は触れたのに
+  // 捕まらない」が起きる。見えている位置で触れた瞬間に申告して取りこぼしを無くす。
+  if (g.role === 'oni' && !locked && !g.over) {
+    for (const r of g.remotes.values()) {
+      if (r.id === g.meId || r.role !== 'run' || r.jailed || r.frozen) continue;
+      const rp = r.hum.root.position;
+      const dx = rp.x - g.pos.x, dz = rp.z - g.pos.z;
+      if (dx * dx + dz * dz < 0.95 * 0.95 && Math.abs(rp.y - g.pos.y) < 1.3) {
+        if (now - (g.lastCatchReq || 0) > 250) {
+          g.lastCatchReq = now;
+          net.touchPlayer(r.id);
+        }
+        break;
+      }
+    }
   }
 
   // ---- 救出 / 氷とかし (逃げが拘束された味方に近づいてタップ or 自動) ----
