@@ -235,6 +235,19 @@ input::placeholder { color: var(--ink-3); }
 #stamina-bar { height: 100%; width: 100%; border-radius: 980px; background: #fff; transition: width .1s linear; }
 #stamina-bar.low { animation: pulse 1s infinite; }
 
+/* スマホ縦などの狭い画面: 上部バーと左右ボタンが重なるので、ボタンを2段目に下げる */
+@media (max-width: 520px) {
+  #btn-exit, #btn-view { top: calc(max(10px, env(safe-area-inset-top)) + 56px); }
+  #btn-mute { top: calc(max(10px, env(safe-area-inset-top)) + 102px); }
+  #status-overlay.mini { top: calc(max(10px, env(safe-area-inset-top)) + 104px);
+    max-width: calc(100vw - 136px); border-radius: 18px;
+    flex-direction: column; gap: 2px; white-space: nowrap; }
+}
+/* 横画面など背の低い画面: ジャンプヒントがミニマップに重ならないようダッシュボタンの左横へ */
+@media (max-height: 480px) {
+  .jump-hint { bottom: 52px; right: 118px; }
+}
+
 /* ---- リザルト ---- */
 .result-inner { position: relative; height: 100%; max-width: 560px; margin: 0 auto;
   padding: max(56px, env(safe-area-inset-top)) 32px 40px;
