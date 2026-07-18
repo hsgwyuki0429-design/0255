@@ -13,7 +13,6 @@
 </script>
 </head>
 <body>
-<!-- ============ ホーム画面 ============ -->
 <div id="screen-home" class="screen active">
   <div class="home-bg"></div>
   <div class="home-inner">
@@ -55,7 +54,6 @@
   <div class="version-tag">バージョン1.6</div>
 </div>
 
-<!-- ============ CPU戦モーダル ============ -->
 <div id="modal-cpu" class="modal hidden">
   <div class="modal-box">
     <h2>🤖 CPUと遊ぶ</h2>
@@ -93,7 +91,6 @@
   </div>
 </div>
 
-<!-- ============ 部屋作成モーダル ============ -->
 <div id="modal-create" class="modal hidden">
   <div class="modal-box">
     <h2>部屋を作る</h2>
@@ -128,7 +125,6 @@
   </div>
 </div>
 
-<!-- ============ ロビー ============ -->
 <div id="screen-lobby" class="screen">
   <div class="home-bg"></div>
   <div class="lobby-inner">
@@ -151,10 +147,8 @@
   </div>
 </div>
 
-<!-- カウントダウン (ホーム/ロビーどちらからでも表示できるよう最上位に置く) -->
 <div id="countdown-overlay" class="countdown hidden"></div>
 
-<!-- ============ ゲーム画面 ============ -->
 <div id="screen-game" class="screen">
   <canvas id="game-canvas"></canvas>
   <div id="hud">
@@ -170,7 +164,6 @@
     <div id="touch-hint" class="hidden">🤝 タッチで助ける!</div>
     <div id="stamina-wrap"><div id="stamina-bar"></div></div>
   </div>
-  <!-- モバイル操作: 左=仮想スティック / 右下=ダッシュ / 右のそれ以外タップ=ジャンプ -->
   <div id="stick-zone"><div id="stick-base" class="hidden"><div id="stick-knob"></div></div></div>
   <div id="right-zone"></div>
   <button id="btn-view">🎥 三人称</button>
@@ -180,7 +173,6 @@
   <div id="jump-hint" class="jump-hint">右側タップでジャンプ</div>
 </div>
 
-<!-- ============ 結果画面 ============ -->
 <div id="screen-result" class="screen">
   <div class="home-bg"></div>
   <div class="result-inner">

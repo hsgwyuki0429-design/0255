@@ -1,9 +1,4 @@
 // ============================================================
-// CPU対戦のボットAI
-// CPUレートが上がるほど「個体値」ではなく挙動・思考が良くなる:
-//   反応速度 / 経路探索の有無と頻度 / 先回り / 逃げ先の吟味 /
-//   仲間の救出判断 / 牢屋の見張り / スタック復帰 など
-// 捕獲は体の接触 (サーバー側で自動判定) なので、鬼はとにかく距離を詰める。
 // ============================================================
 import { moveCapsule } from '../public/shared/collision.js';
 
@@ -12,7 +7,6 @@ const JUMP_V = 5.6;
 const SPEED_RUN = 5.3;
 const SPEED_ONI = 5.75;
 
-// CPUレート → 難易度レベル (0〜5)
 export function cpuLevelOf(rating) {
   if (rating < 900) return 0;
   if (rating < 1000) return 1;
@@ -26,7 +20,6 @@ export const CPU_LEVEL_NAMES = ['みならい鬼', 'ふつうの鬼', 'しっか
 const BOT_NAMES = ['ボルト', 'ナット', 'コグ', 'チップ', 'ギア', 'ピストン', 'レンチ', 'リベット'];
 export function botName(i) { return '🤖' + BOT_NAMES[i % BOT_NAMES.length]; }
 
-// レベル別パラメータ: 速度は全レベル同じ。賢さだけが変わる。
 const PARAMS = [
   { react: 900, usePath: false, repath: 2200, predict: 0,    fleeDist: 7,  rescue: false, boldness: 0,  guardJail: false, idleP: 0.55 },
   { react: 650, usePath: true,  repath: 1800, predict: 0,    fleeDist: 9,  rescue: false, boldness: 0,  guardJail: false, idleP: 0.40 },
@@ -50,7 +43,7 @@ export class BotBrain {
     this.vel = { x: 0, y: 0, z: 0 };
     this.path = null;
     this.pathIdx = 0;
-    this.goal = null;          // 経路の最終目的地
+    this.goal = null;
     this.nextThink = 0;
     this.nextRepath = 0;
     this.mode = 'idle';
@@ -58,11 +51,10 @@ export class BotBrain {
     this.stuckT = 0;
     this.lastPos = { x: this.pos.x, z: this.pos.z };
     this.lastProbe = 0;
-    this.tprev = new Map();    // 対象の速度推定用 {id: {x,z,t}}
+    this.tprev = new Map();
     this.jitter = Math.random() * 1000;
   }
 
-  // 対象の移動速度を推定 (先回り用)
   velOf(tp, now) {
     const prev = this.tprev.get(tp.id);
     this.tprev.set(tp.id, { x: tp.pos[0], z: tp.pos[2], t: now });
@@ -90,7 +82,6 @@ export class BotBrain {
 
     if (gp.role === 'oni') {
       if (now < g.graceUntil) { this.mode = 'idle'; this.path = null; return; }
-      // ---- 見張り: 泥警で捕虜がいれば、鬼のうち1人が牢屋周辺を守る (高レベルのみ) ----
       const jailedList = players.filter(p => p.role === 'run' && p.jailed);
       if (P.guardJail && room.mode === 'doro' && jailedList.length) {
         const onis = players.filter(p => p.role === 'oni').map(p => p.id).sort();
@@ -102,7 +93,6 @@ export class BotBrain {
           return;
         }
       }
-      // ---- 追跡対象の選択 ----
       const targets = players.filter(p =>
         p.id !== this.id && p.role === 'run' && !p.jailed && !p.frozen && now >= (p.immuneUntil || 0));
       if (!targets.length) { this.mode = 'wander'; this.wander(); return; }
@@ -110,7 +100,6 @@ export class BotBrain {
       for (const t of targets) {
         let d = dist2(t, [this.pos.x, 0, this.pos.z]) + Math.abs(t.pos[1] - this.pos.y) * 2;
         if (this.level >= 3) {
-          // 賢い鬼は「他の鬼が既に追っている相手」より孤立した相手を選ぶ
           for (const o of players) {
             if (o.role === 'oni' && o.id !== this.id && dist2(t, o.pos) < 6) d += 5;
           }
@@ -125,7 +114,6 @@ export class BotBrain {
       return;
     }
 
-    // ================= 逃げ側 =================
     if (gp.jailed || gp.frozen) { this.mode = 'idle'; this.path = null; return; }
     const onis = players.filter(p => p.role === 'oni' && !p.jailed && !p.frozen);
     let nearest = null, nd = Infinity;
@@ -134,7 +122,6 @@ export class BotBrain {
       if (d < nd) { nd = d; nearest = o; }
     }
     if (nearest && nd < P.fleeDist) {
-      // ---- 逃走: 鬼と反対側の候補点を数方向試し、一番安全で通れる所へ ----
       this.mode = 'flee';
       const ax = this.pos.x - nearest.pos[0], az = this.pos.z - nearest.pos[2];
       const base = Math.atan2(az, ax);
@@ -149,7 +136,6 @@ export class BotBrain {
         const pt = this.nav.posOf(n);
         let score = 0;
         for (const o of onis) score += Math.min(24, Math.hypot(pt.x - o.pos[0], pt.z - o.pos[2]));
-        // 高レベルは壁際・角に追い込まれるのを避ける
         if (this.level >= 3) {
           const edge = Math.min(pt.x - b.minX, b.maxX - pt.x, pt.z - b.minZ, b.maxZ - pt.z);
           score += Math.min(8, edge) * 0.6;
@@ -160,7 +146,6 @@ export class BotBrain {
       if (bestPt) this.setGoal(bestPt.x, bestPt.y, bestPt.z);
       return;
     }
-    // ---- 救出: 鬼が十分遠ければ捕まっている仲間の元へ ----
     if (P.rescue && (room.mode === 'doro' || room.mode === 'koori')) {
       const captives = players.filter(p => p.id !== this.id && p.role === 'run' && (p.jailed || p.frozen));
       if (captives.length && (!nearest || nd > P.boldness * 0.7)) {
@@ -169,7 +154,6 @@ export class BotBrain {
           const d = dist2(cc, [this.pos.x, 0, this.pos.z]);
           if (d < cd) { cd = d; c = cc; }
         }
-        // 牢屋に鬼が張り付いていたら諦める (レベル4+はしっかり確認)
         let danger = 0;
         for (const o of onis) danger += dist2(o, c.pos) < (this.level >= 4 ? 7 : 4) ? 1 : 0;
         if (!danger) {
@@ -180,7 +164,6 @@ export class BotBrain {
         }
       }
     }
-    // ---- 平常時: ぶらぶら歩く (低レベルほどボーッと立ち止まる) ----
     if (this.mode !== 'wander' || !this.goal || Math.hypot(this.goal.x - this.pos.x, this.goal.z - this.pos.z) < 1.2) {
       this.mode = 'wander';
       if (Math.random() < P.idleP) { this.goal = null; this.path = null; return; }
@@ -201,7 +184,6 @@ export class BotBrain {
     if (!gp) return;
     const P = this.p;
 
-    // 拘束中は動かない
     if (gp.jailed || gp.frozen) {
       this.pos.x = gp.pos[0]; this.pos.y = gp.pos[1]; this.pos.z = gp.pos[2];
       this.vel.x = this.vel.y = this.vel.z = 0;
@@ -210,13 +192,11 @@ export class BotBrain {
       return;
     }
 
-    // ---- 思考 (反応速度 = レベル依存) ----
     if (now >= this.nextThink) {
       this.nextThink = now + P.react * (0.8 + Math.random() * 0.4);
       this.think(now);
     }
 
-    // ---- 追跡対象が近いときは経路より直接追う (接触すればサーバーが捕獲判定) ----
     let steer = null;
     const isOni = gp.role === 'oni';
     const locked = isOni && now < g.graceUntil;
@@ -229,7 +209,6 @@ export class BotBrain {
         }
       }
     }
-    // ---- 救出タッチ ----
     if (this.mode === 'rescue' && this.targetId) {
       const t = g.players.get(this.targetId);
       if (t && (t.jailed || t.frozen) &&
@@ -239,7 +218,6 @@ export class BotBrain {
       }
     }
 
-    // ---- 経路追従 / 直接移動 ----
     let wantJump = false;
     if (!steer && this.path && this.path.length) {
       let wp = this.path[this.pathIdx];
@@ -256,7 +234,6 @@ export class BotBrain {
     }
     if (!steer && this.goal) steer = { x: this.goal.x, z: this.goal.z };
 
-    // ---- 操舵 → 速度 (人間と同じく切り返しに慣性) ----
     const maxSp = (isOni ? SPEED_ONI : SPEED_RUN);
     let want = false;
     if (steer && !locked) {
@@ -275,7 +252,6 @@ export class BotBrain {
       this.vel.z *= Math.max(0, 1 - dt * 10);
     }
 
-    // ---- スタック検知: 進みたいのに進めない → ジャンプ / 経路再計算 ----
     if (want) {
       const moved = Math.hypot(this.pos.x - this.lastPos.x, this.pos.z - this.lastPos.z);
       if (now - this.lastProbe > 500) {
@@ -287,7 +263,6 @@ export class BotBrain {
             this.stuckT = 0;
             this.nextThink = 0;
             this.nextRepath = 0;
-            // 横に一歩ずらす
             const a = Math.atan2(this.vel.z, this.vel.x) + (Math.random() < 0.5 ? 1.6 : -1.6);
             this.vel.x = Math.cos(a) * maxSp * 0.7;
             this.vel.z = Math.sin(a) * maxSp * 0.7;
@@ -301,13 +276,11 @@ export class BotBrain {
       this.stuckT = 0;
     }
 
-    // ---- 定期的な経路更新 (追跡中は目標が動くので) ----
     if (this.goal && P.usePath && now > this.nextRepath && (this.mode === 'chase' || this.mode === 'flee')) {
       this.nextRepath = now + P.repath;
       this.setGoal(this.goal.x, this.goal.y, this.goal.z);
     }
 
-    // ---- 物理 ----
     if (wantJump && this.onGround) this.vel.y = JUMP_V;
     this.vel.y += GRAVITY * dt;
     if (this.vel.y < -18) this.vel.y = -18;
@@ -315,7 +288,6 @@ export class BotBrain {
     this.onGround = res.onGround;
     if (res.onGround && this.vel.y < 0) this.vel.y = 0;
 
-    // ---- 状態をゲームへ反映 ----
     gp.pos = [this.pos.x, this.pos.y, this.pos.z];
     const hs = Math.hypot(this.vel.x, this.vel.z);
     if (hs > 0.4) gp.ry = Math.atan2(this.vel.x, this.vel.z);

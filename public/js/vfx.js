@@ -1,4 +1,3 @@
-// 視覚エフェクト: パーティクルプール + ヒットリング
 import * as THREE from 'three';
 
 const MAX = 240;
@@ -38,10 +37,8 @@ export class VFX {
   dust(pos) { this.spawn(pos, 0xccbbaa, 5, 1.2, 0.4, 1.5, 2.5); }
   sparkle(pos, color = 0x88ffcc) { this.spawn(pos, color, 22, 2.4, 0.9, 1.2, 2); }
 
-  // ペイントが弾ける飛沫
   paintBurst(pos, color) { this.spawn(pos, color, 26, 3.2, 0.65, -5, 2.2); }
 
-  // 捕獲/救出のリング波
   ring(pos, color = 0xff4444) {
     const mesh = new THREE.Mesh(
       new THREE.RingGeometry(0.2, 0.34, 28),

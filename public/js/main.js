@@ -1,6 +1,4 @@
 // ============================================================
-// ONI RUSH - クライアント本体
-// 画面遷移 / 3Dゲームループ / カメラ / ネット同期 / HUD
 // ============================================================
 import * as THREE from 'three';
 import { Net } from './net.js';
@@ -12,7 +10,6 @@ import { Minimap } from './minimap.js';
 import { VFX } from './vfx.js';
 import { initAudio, SFX, isMuted, setMuted } from './sfx.js';
 
-// ---------------- 基本状態 ----------------
 const $ = id => document.getElementById(id);
 const net = new Net();
 const input = new Input();
@@ -20,14 +17,13 @@ input.attach();
 
 let me = { id: null, name: '', rating: 1000, cpuRating: 1000 };
 let currentRoom = null;
-let game = null;   // ゲーム中の全状態
+let game = null;
 
 const deviceId = localStorage.getItem('oni-device') || (crypto.randomUUID ? crypto.randomUUID() : 'd' + Math.random().toString(36).slice(2));
 localStorage.setItem('oni-device', deviceId);
 
 const TIERS = [[1400, '🌋 マグマ'], [1250, '💎 ダイヤ'], [1100, '🥇 ゴールド'], [1000, '🥈 シルバー'], [0, '🥉 ブロンズ']];
 function tierOf(r) { return TIERS.find(([m]) => r >= m)[1]; }
-// CPU戦: レート帯 → CPUの賢さ (サーバー側 bots.js と対応)
 const CPU_LEVELS = [[1400, '👺 鬼神'], [1250, '🧠 鬼軍師'], [1100, '📚 かしこい鬼'], [1000, '🎯 しっかり鬼'], [900, '👹 ふつうの鬼'], [0, '🐣 みならい鬼']];
 function cpuLevelNameOf(r) { return CPU_LEVELS.find(([m]) => r >= m)[1]; }
 function updateCpuBadge() {
@@ -47,7 +43,6 @@ function toast(msg) {
   t._t = setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-// ---------------- 接続 & ホーム ----------------
 async function connect() {
   const name = ($('inp-name').value || localStorage.getItem('oni-name') || 'プレイヤー' + (Math.random() * 1000 | 0)).trim();
   $('inp-name').value = name;
@@ -97,7 +92,6 @@ net.on('disconnect', () => { if (game) toast('サーバーとの接続が切れ�
 $('btn-refresh').onclick = refreshRooms;
 $('inp-name').addEventListener('change', connect);
 
-// ---------------- 部屋作成 ----------------
 const cState = { mode: 'doro', mapId: 'school' };
 function segInit(id, cb) {
   $(id).querySelectorAll('button').forEach(b => b.onclick = () => {
@@ -122,7 +116,6 @@ $('c-ok').onclick = async () => {
   if (res.ok) { $('modal-create').classList.add('hidden'); enterLobby(res.room); }
   else toast(res.error);
 };
-// ---------------- CPU戦 ----------------
 const cpuState = { mode: 'doro', mapId: 'school', myRole: 'random' };
 segInit('cpu-mode', v => cpuState.mode = v);
 segInit('cpu-map', v => cpuState.mapId = v);
@@ -153,7 +146,6 @@ $('btn-join-private').onclick = async () => {
   else toast(res.error);
 };
 
-// ---------------- ロビー ----------------
 function enterLobby(room) {
   currentRoom = room;
   show('screen-lobby');
@@ -188,7 +180,7 @@ $('btn-leave').onclick = () => { net.leaveRoom(); currentRoom = null; show('scre
 $('btn-start').onclick = () => { initAudio(); net.startGame(); };
 
 net.on('roomUpdate', room => {
-  if (room.isCpu) return; // CPU戦はロビーを使わない
+  if (room.isCpu) return;
   if ($('screen-lobby').classList.contains('active') || $('screen-result').classList.contains('active')) renderLobby(room);
   else currentRoom = room;
 });
@@ -199,9 +191,8 @@ net.on('countdown', ({ n }) => {
   SFX.countdown();
 });
 
-// ---------------- 3D ゲーム ----------------
-const MOVE_SPEED_RUN = 5.3;   // 逃げ
-const MOVE_SPEED_ONI = 5.75;  // 鬼は少し速い
+const MOVE_SPEED_RUN = 5.3;
+const MOVE_SPEED_ONI = 5.75;
 const JUMP_V = 5.6;
 const GRAVITY = -14.5;
 
@@ -214,7 +205,6 @@ function initRenderer() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, input.isTouch ? 2 : 2));
   renderer.shadowMap.enabled = !input.isTouch;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  // FOV 78°: 140°は魚眼歪みで3D酔いの原因になるため、快適な標準視野に戻した
   camera = new THREE.PerspectiveCamera(78, innerWidth / innerHeight, 0.1, 320);
   window.addEventListener('resize', () => {
     renderer.setSize(innerWidth, innerHeight);
@@ -248,7 +238,6 @@ function startGame(data) {
     remotes.set(p.id, {
       id: p.id, name: p.name, role: p.role, hum: h,
       jailed: false, frozen: false,
-      // 補間バッファ
       buf: [], cur: new THREE.Vector3(...p.pos), ry: 0, speed: 0, onG: true, lastY: p.pos[1]
     });
   }
@@ -259,25 +248,23 @@ function startGame(data) {
     role: data.you.role, jailed: false, frozen: false,
     pos: new THREE.Vector3(...data.you.pos),
     vel: new THREE.Vector3(),
-    yaw: Math.atan2(-data.you.pos[0], -data.you.pos[2]), // 中央を向いてスタート
+    yaw: Math.atan2(-data.you.pos[0], -data.you.pos[2]),
     camYaw: 0, camPitch: 0.32,
-    // サーバーとの時計ずれを避けるため、経過時間ベースでローカル時刻に換算
     onGround: true,
     endsAt: Date.now() + data.timeLimit * 1000,
     graceUntil: Date.now() + Math.max(0, data.graceUntil - (data.endsAt - data.timeLimit * 1000)),
     lastSend: 0, lastTouch: 0, stepAcc: 0, stepAlt: false,
     over: false,
-    stamina: 100, stamLock: false,      // ダッシュ用スタミナ
-    camEyeY: data.you.pos[1]            // カメラ高さは階段でガタつかないよう平滑化
+    stamina: 100, stamLock: false,
+    camEyeY: data.you.pos[1]
   };
   game.camYaw = game.yaw - Math.PI;
   meR.hum.root.position.copy(game.pos);
-  if (meR.hum.tag) meR.hum.tag.visible = false; // 自分の名札は非表示
+  if (meR.hum.tag) meR.hum.tag.visible = false;
   applyViewMode();
 
   updateRoleHUD();
   updateCountHUD();
-  // 開始猶予の表示: 逃げは動けるのに「スタートまで」と出ると紛らわしいので役割別の文言に
   $('grace-label').textContent = game.role === 'oni' ? '👹 鬼はまだ動けない…' : '🏃 今のうちに逃げろ! 鬼が動くまで';
   $('hud-msg').innerHTML = '';
   $('status-overlay').classList.add('hidden');
@@ -297,13 +284,12 @@ function updateRoleHUD() {
   $('btn-dash').style.display = input.isTouch ? '' : 'none';
 }
 
-// ---------------- 視点切替 (一人称/三人称) ----------------
-let viewMode = localStorage.getItem('oni-view') || 'tp'; // 'tp'=三人称 / 'fp'=一人称
+let viewMode = localStorage.getItem('oni-view') || 'tp';
 function applyViewMode() {
   $('btn-view').textContent = viewMode === 'fp' ? '👁 一人称' : '🎥 三人称';
   if (game) {
     const meR = game.remotes.get(game.meId);
-    if (meR) meR.hum.root.visible = viewMode !== 'fp'; // 一人称では自分の体を消す
+    if (meR) meR.hum.root.visible = viewMode !== 'fp';
   }
 }
 $('btn-view').addEventListener('click', e => { e.stopPropagation(); toggleView(); });
@@ -315,14 +301,12 @@ function toggleView() {
 }
 applyViewMode();
 
-// ---------------- ミュート切替 ----------------
 function applyMuteBtn() { $('btn-mute').textContent = isMuted() ? '🔇' : '🔊'; }
 function toggleMute() { setMuted(!isMuted()); applyMuteBtn(); }
 $('btn-mute').addEventListener('click', e => { e.stopPropagation(); toggleMute(); });
 $('btn-mute').addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); toggleMute(); }, { passive: false });
 applyMuteBtn();
 
-// ---------------- ゲーム中の退出 (誤タップ防止の2段階) ----------------
 let exitArmAt = 0;
 function resetExitBtn() { $('btn-exit').textContent = '🚪'; $('btn-exit').classList.remove('arm'); }
 function onExitTap() {
@@ -360,10 +344,9 @@ function hudMsg(text, color = '#fff') {
   setTimeout(() => el.remove(), 3500);
 }
 
-// ---------------- スナップショット受信 (補間用にバッファ) ----------------
 net.on('snap', ({ ps }) => {
   if (!game) return;
-  const t = Date.now(); // 受信時刻基準 (サーバーとの時計ずれの影響を受けない)
+  const t = Date.now();
   for (const [id, arr] of Object.entries(ps)) {
     const r = game.remotes.get(id);
     if (!r || id === game.meId) continue;
@@ -377,11 +360,9 @@ net.on('timeSync', ({ remain }) => {
   game.endsAt = Date.now() + remain;
 });
 
-// ---------------- ゲームイベント ----------------
 net.on('ev', ev => {
   if (!game && ev.type !== 'joined' && ev.type !== 'left' && ev.type !== 'chat') return;
   const r = ev.id ? game?.remotes.get(ev.id) : null;
-  // ペイント弾が当たった相手の体にインクの痕を付ける
   const paintOn = (target, shooterId) => {
     if (!target) return;
     const sh = shooterId ? game.remotes.get(shooterId) : null;
@@ -441,7 +422,7 @@ net.on('ev', ev => {
     }
     case 'swapped': {
       SFX.swapped();
-      if (ev.newRun) paintOn(game.remotes.get(ev.newOni), ev.newRun); // タッチした側のインクが付く
+      if (ev.newRun) paintOn(game.remotes.get(ev.newOni), ev.newRun);
       const no = game.remotes.get(ev.newOni), nr = ev.newRun ? game.remotes.get(ev.newRun) : null;
       if (no) { no.role = 'oni'; no.hum.setRole('oni'); vfx.burst(no.hum.root.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xff4444); }
       if (nr) { nr.role = 'run'; nr.hum.setRole('run'); }
@@ -466,7 +447,6 @@ function showStatus(title, sub) {
   const el = $('status-overlay');
   el.innerHTML = `${title}<small>${sub}</small>`;
   el.classList.remove('hidden', 'mini');
-  // 拘束が長引いても視界を塞ぎ続けないよう、数秒で小さなバナーに畳む
   clearTimeout(statusMiniT);
   statusMiniT = setTimeout(() => el.classList.add('mini'), 2800);
 }
@@ -480,7 +460,6 @@ function showStatusFlash(text) {
   setTimeout(hideStatus, 1600);
 }
 
-// ---------------- 結果 ----------------
 net.on('gameEnd', ({ winner, mode, isCpu, results }) => {
   if (!game) return;
   input.enabled = false;
@@ -504,7 +483,7 @@ net.on('gameEnd', ({ winner, mode, isCpu, results }) => {
   }).join('');
   if (meRes) {
     if (isCpu) {
-      me.cpuRating = meRes.rating; // CPU戦は専用レートのみ変動
+      me.cpuRating = meRes.rating;
       updateCpuBadge();
     } else {
       me.rating = meRes.rating;
@@ -512,7 +491,7 @@ net.on('gameEnd', ({ winner, mode, isCpu, results }) => {
       $('my-tier').textContent = tierOf(me.rating);
     }
   }
-  if (isCpu) currentRoom = null; // CPU部屋はサーバー側で解散される
+  if (isCpu) currentRoom = null;
   setTimeout(() => {
     cleanupGame();
     show('screen-result');
@@ -532,7 +511,6 @@ function cleanupGame() {
   game = null;
 }
 
-// ---------------- メインループ ----------------
 let animating = false;
 let lastT = performance.now();
 const tmpV = new THREE.Vector3();
@@ -548,15 +526,13 @@ function loop(t) {
   const now = Date.now();
   const inGrace = now < g.graceUntil;
 
-  // ---- カメラ回転 (スワイプ/ドラッグ) ----
   const look = input.consumeLook();
-  g.camYaw -= look.dx * 0.0042; // 右ドラッグ=右を向く (three.jsは+z向き時+xが左)
+  g.camYaw -= look.dx * 0.0042;
   const fp = viewMode === 'fp';
   g.camPitch = fp
     ? THREE.MathUtils.clamp(g.camPitch + look.dy * 0.0035, -1.25, 1.25)
     : THREE.MathUtils.clamp(g.camPitch + look.dy * 0.0035, -0.5, 1.1);
 
-  // ---- ダッシュ & スタミナ ----
   const mv = input.getMove();
   const moving = !!(mv.x || mv.y);
   const wantSprint = input.getSprint() && moving;
@@ -572,18 +548,15 @@ function loop(t) {
   stBar.style.width = g.stamina + '%';
   stBar.classList.toggle('low', g.stamina < 30);
 
-  // ---- 移動 (現実の人間のように慣性がある: 切り返し時は踏ん張る分だけ反応が鈍い) ----
   const locked = g.jailed || g.frozen || g.over || (inGrace && g.role === 'oni');
   if (!locked && moving) {
     let maxSp = g.role === 'oni' ? MOVE_SPEED_ONI : MOVE_SPEED_RUN;
     if (sprinting) maxSp *= 1.33;
-    // カメラ基準の移動方向
-    const ang = Math.atan2(mv.x, -mv.y); // 上=前
-    const wish = g.camYaw + Math.PI - ang; // (+z向き時+xは左なので右入力=角度マイナス)
+    const ang = Math.atan2(mv.x, -mv.y);
+    const wish = g.camYaw + Math.PI - ang;
     const mag = Math.min(1, Math.hypot(mv.x, mv.y));
     const tvx = Math.sin(wish) * maxSp * mag;
     const tvz = Math.cos(wish) * maxSp * mag;
-    // 現在速度と希望方向のずれで機動力を変える: 逆へ切り返すほど加速が効きにくい
     const curSp = Math.hypot(g.vel.x, g.vel.z);
     let align = 1;
     if (curSp > 0.8) {
@@ -593,34 +566,29 @@ function loop(t) {
     const k = Math.min(1, dt * agility);
     g.vel.x += (tvx - g.vel.x) * k;
     g.vel.z += (tvz - g.vel.z) * k;
-    // キャラの向きをなめらかに移動方向へ
     const targetYaw = wish;
     let dy = targetYaw - g.yaw;
     while (dy > Math.PI) dy -= Math.PI * 2;
     while (dy < -Math.PI) dy += Math.PI * 2;
     g.yaw += dy * Math.min(1, dt * 10);
   } else {
-    g.vel.x *= Math.max(0, 1 - dt * (g.onGround ? 9 : 2.5)); // 減速にも慣性 (空中はほぼ滑る)
+    g.vel.x *= Math.max(0, 1 - dt * (g.onGround ? 9 : 2.5));
     g.vel.z *= Math.max(0, 1 - dt * (g.onGround ? 9 : 2.5));
   }
 
-  // ---- 視点の自動追従: スワイプしていない間は進行方向へゆっくり向く ----
   if (moving && performance.now() - input.lastLookT > 900) {
     let dyaw = (g.yaw - Math.PI) - g.camYaw;
     while (dyaw > Math.PI) dyaw -= Math.PI * 2;
     while (dyaw < -Math.PI) dyaw += Math.PI * 2;
-    // 真後ろへ走るときは回さない (カメラが暴れるため)
     if (Math.abs(dyaw) < 2.55) g.camYaw += dyaw * Math.min(1, dt * 3.0);
   }
 
-  // ジャンプ
   if (input.consumeJump() && !locked && g.onGround) {
     g.vel.y = JUMP_V;
     g.onGround = false;
     SFX.jump();
     vfx.dust(g.pos.clone());
   }
-  // 重力
   g.vel.y += GRAVITY * dt;
   if (g.vel.y < -18) g.vel.y = -18;
 
@@ -630,19 +598,15 @@ function loop(t) {
     g.onGround = res.onGround;
     if (g.onGround && g.vel.y < 0) g.vel.y = 0;
     if (g.onGround && !wasGround) { SFX.land(); vfx.dust(g.pos.clone()); }
-    if (res.bounced) { SFX.jump(); vfx.sparkle(g.pos.clone(), 0x66ddff); } // トランポリン
+    if (res.bounced) { SFX.jump(); vfx.sparkle(g.pos.clone(), 0x66ddff); }
   }
 
-  // 足音
   const hSpeed = Math.hypot(g.vel.x, g.vel.z);
   if (g.onGround && hSpeed > 1) {
     g.stepAcc += hSpeed * dt;
     if (g.stepAcc > 2.1) { g.stepAcc = 0; g.stepAlt = !g.stepAlt; SFX.step(g.stepAlt); }
   }
 
-  // ---- 鬼の捕獲タッチ: 画面上で体が触れたら即サーバーへ申告 (権威判定はサーバー) ----
-  // 相手の表示は補間で少し過去のため、サーバー自動判定だけだと「見た目は触れたのに
-  // 捕まらない」が起きる。見えている位置で触れた瞬間に申告して取りこぼしを無くす。
   if (g.role === 'oni' && !locked && !g.over) {
     for (const r of g.remotes.values()) {
       if (r.id === g.meId || r.role !== 'run' || r.jailed || r.frozen) continue;
@@ -658,7 +622,6 @@ function loop(t) {
     }
   }
 
-  // ---- 救出 / 氷とかし (逃げが拘束された味方に近づいてタップ or 自動) ----
   let touchTarget = null;
   if (g.role === 'run' && !g.jailed && !g.frozen && !g.over) {
     for (const r of g.remotes.values()) {
@@ -674,13 +637,11 @@ function loop(t) {
     SFX.touch();
   }
 
-  // ---- 自機の見た目更新 ----
   meR.hum.root.position.copy(g.pos);
   meR.hum.root.rotation.y = g.yaw;
   meR.hum.setFrozen(g.frozen);
   meR.hum.update({ dt, speed: hSpeed, velY: g.vel.y, onGround: g.onGround, frozen: g.frozen, jailed: g.jailed });
 
-  // ---- リモートプレイヤー補間 (100ms遅延再生) ----
   const renderT = now - 130;
   for (const r of g.remotes.values()) {
     if (r.id === g.meId) continue;
@@ -714,15 +675,12 @@ function loop(t) {
     r.hum.update({ dt, speed: r.speed, velY: (ty - prev.y) / Math.max(dt, 0.001), onGround: r.onG, frozen: r.frozen, jailed: r.jailed });
   }
 
-  // ---- カメラ ----
-  // 階段のステップアップで pos.y が小刻みに跳ねるため、目線の高さだけ平滑化して振動を消す
-  const eyeFollow = g.onGround ? 9 : 25; // 空中(ジャンプ/落下)は素早く追従
+  const eyeFollow = g.onGround ? 9 : 25;
   g.camEyeY += (g.pos.y - g.camEyeY) * Math.min(1, dt * eyeFollow);
-  if (Math.abs(g.pos.y - g.camEyeY) > 2.5) g.camEyeY = g.pos.y; // 大きく離れたら追い付く
+  if (Math.abs(g.pos.y - g.camEyeY) > 2.5) g.camEyeY = g.pos.y;
   if (fp) {
-    // ---- 一人称: 目の位置にカメラを置き、視線方向をそのまま見る ----
     const eye = tmpV.set(g.pos.x, g.camEyeY + 0.78, g.pos.z).clone();
-    const fyaw = g.camYaw + Math.PI; // カメラは自分の背後基準なので前方へ反転
+    const fyaw = g.camYaw + Math.PI;
     const look = new THREE.Vector3(
       eye.x + Math.sin(fyaw) * Math.cos(g.camPitch),
       eye.y - Math.sin(g.camPitch),
@@ -731,7 +689,6 @@ function loop(t) {
     camera.position.copy(eye);
     camera.lookAt(look);
   } else {
-    // ---- 三人称: 背後から見下ろす (壁めり込み防止つき) ----
     const eye = tmpV.set(g.pos.x, g.camEyeY + 0.95, g.pos.z).clone();
     const dist = 2.8;
     const cx = eye.x - Math.sin(g.camYaw + Math.PI) * Math.cos(g.camPitch) * dist;
@@ -760,13 +717,11 @@ function loop(t) {
     $('grace-overlay').classList.add('hidden');
   }
 
-  // ---- ミニマップ (自分の位置だけ) ----
   minimap.draw(g.pos.x, g.pos.y, g.pos.z, g.yaw);
 
   // ---- VFX ----
   vfx.update(dt);
 
-  // ---- 状態送信 (20Hz) ----
   if (t - g.lastSend > 50) {
     g.lastSend = t;
     let s = 0;
@@ -778,10 +733,8 @@ function loop(t) {
   renderer.render(scene, camera);
 }
 
-// デバッグ/テスト用フック
 window.__game = () => game;
 
-// ---------------- 起動 ----------------
 document.body.addEventListener('touchstart', () => initAudio(), { once: true });
 document.body.addEventListener('mousedown', () => initAudio(), { once: true });
 show('screen-home');

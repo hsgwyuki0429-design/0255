@@ -1,12 +1,8 @@
-// マップデータ → Three.js シーン構築 + 衝突用AABBリスト生成
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MAPS, solidsOf } from '/shared/mapdata.js';
 
 // ============================================================
-// 手続きテクスチャ: 画像ファイルを増やさず、既存の材質分類 (b.m) ごとに
-// canvas へ模様を描いて生成する。ほぼグレースケールで描き、マテリアル色との
-// 乗算で発色させるため、マップごとの配色デザインはそのまま保たれる。
 // ============================================================
 const texCache = new Map();
 
@@ -22,7 +18,6 @@ function rng(seed) {
 const gray = v => `rgb(${v | 0},${v | 0},${v | 0})`;
 
 const TEX_DRAW = {
-  // 岩肌: まだら + ひび
   stone(g, S, r) {
     g.fillStyle = gray(220); g.fillRect(0, 0, S, S);
     for (let i = 0; i < 70; i++) {
@@ -39,7 +34,6 @@ const TEX_DRAW = {
       g.stroke();
     }
   },
-  // 土: 細かい砂粒 + 湿り気のむら
   dirt(g, S, r) {
     g.fillStyle = gray(216); g.fillRect(0, 0, S, S);
     for (let i = 0; i < 12; i++) {
@@ -51,7 +45,6 @@ const TEX_DRAW = {
       g.fillRect(r() * S, r() * S, 1 + r() * 2, 1 + r() * 2);
     }
   },
-  // 木: 縦板 + 木目 (木目だけ暖色にして乗算後もぬくもりを出す)
   wood(g, S, r) {
     for (let p = 0; p < 4; p++) {
       g.fillStyle = gray(212 + r() * 22);
@@ -63,7 +56,7 @@ const TEX_DRAW = {
         for (let y = 0; y <= S; y += 16) g.lineTo(x0 + Math.sin(y * 0.11 + p + l) * 2.4, y);
         g.stroke();
       }
-      if (r() < 0.6) { // 節
+      if (r() < 0.6) {
         g.strokeStyle = 'rgba(105,80,55,.30)';
         g.beginPath(); g.ellipse(p * 32 + 8 + r() * 16, r() * S, 2.5, 4, 0, 0, 6.3); g.stroke();
       }
@@ -71,7 +64,6 @@ const TEX_DRAW = {
     g.fillStyle = 'rgba(80,70,60,.35)';
     for (let p = 0; p <= 4; p++) g.fillRect(p * 32 - 1, 0, 2, S);
   },
-  // タイル: 目地グリッド + タイルごとの色むら
   tile(g, S, r) {
     for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
       g.fillStyle = gray(229 + r() * 14);
@@ -83,7 +75,6 @@ const TEX_DRAW = {
       g.beginPath(); g.moveTo(0, k * 32); g.lineTo(S, k * 32); g.stroke();
     }
   },
-  // 金属: ヘアライン + わずかな汚れ
   metal(g, S, r) {
     g.fillStyle = gray(228); g.fillRect(0, 0, S, S);
     for (let i = 0; i < 60; i++) {
@@ -95,7 +86,6 @@ const TEX_DRAW = {
       g.fillRect(0, r() * S, S, 1);
     }
   },
-  // 陳列棚: 棚板の横ライン + 商品の色むら
   shelf(g, S, r) {
     g.fillStyle = gray(226); g.fillRect(0, 0, S, S);
     for (let i = 0; i < 46; i++) {
@@ -107,7 +97,6 @@ const TEX_DRAW = {
       g.fillStyle = 'rgba(255,255,255,.12)'; g.fillRect(0, y + 3, S, 2);
     }
   },
-  // 葉: 木漏れ日のまだら
   leaf(g, S, r) {
     g.fillStyle = gray(198); g.fillRect(0, 0, S, S);
     for (let i = 0; i < 110; i++) {
@@ -115,7 +104,6 @@ const TEX_DRAW = {
       g.beginPath(); g.arc(r() * S, r() * S, 3 + r() * 8, 0, 6.3); g.fill();
     }
   },
-  // 水面: 横に流れるさざ波
   water(g, S, r) {
     g.fillStyle = gray(232); g.fillRect(0, 0, S, S);
     for (let i = 0; i < 16; i++) {
@@ -127,7 +115,6 @@ const TEX_DRAW = {
       g.stroke();
     }
   },
-  // 骨: 縦のすじ + 小さな窪み
   bone(g, S, r) {
     g.fillStyle = gray(236); g.fillRect(0, 0, S, S);
     for (let i = 0; i < 30; i++) {
@@ -139,7 +126,6 @@ const TEX_DRAW = {
       g.beginPath(); g.arc(r() * S, r() * S, 1 + r() * 2, 0, 6.3); g.fill();
     }
   },
-  // フェンス: 金網のひし形クロス
   fence(g, S, r) {
     g.fillStyle = gray(232); g.fillRect(0, 0, S, S);
     g.strokeStyle = 'rgba(85,92,100,.4)'; g.lineWidth = 2;
@@ -148,7 +134,6 @@ const TEX_DRAW = {
       g.beginPath(); g.moveTo(k, S); g.lineTo(k + S, 0); g.stroke();
     }
   },
-  // 結晶: 斜めのファセット筋
   crystal(g, S, r) {
     g.fillStyle = gray(232); g.fillRect(0, 0, S, S);
     for (let i = 0; i < 14; i++) {
@@ -163,9 +148,6 @@ const TEX_DRAW = {
 TEX_DRAW.rail = TEX_DRAW.metal;
 
 // ============================================================
-// 絵付きテクスチャ: 本棚の本・商品棚・自販機など「それと分かる絵」を実色で
-// 描く材質。こちらはマテリアル色を白にして絵をそのまま表示する
-// (ベース色 c は枠や地の色として絵の中に取り込む)。
 // ============================================================
 function css(hex, f = 1) {
   const r = Math.min(255, ((hex >> 16) & 255) * f) | 0;
@@ -177,9 +159,8 @@ const SPINES = [0xb3453e, 0x3e68b3, 0x3e9b57, 0xc9973b, 0x7a4ab0, 0x2a8a9a, 0xb3
 const PACKS = [0xe05555, 0xf0a030, 0x50a8e0, 0x60c070, 0xf0e060, 0xd070c0, 0xffffff, 0x8060d0];
 
 const ART_DRAW = {
-  // 本棚: 木の棚板 + 色とりどりの背表紙 (1段=0.5m)
   books(g, S, r, c) {
-    g.fillStyle = css(c, 0.72); g.fillRect(0, 0, S, S); // 奥板
+    g.fillStyle = css(c, 0.72); g.fillRect(0, 0, S, S);
     for (let row = 0; row < 4; row++) {
       const y = row * 32;
       let x = 2 + r() * 4;
@@ -188,13 +169,12 @@ const ART_DRAW = {
         g.fillStyle = css(SPINES[(r() * SPINES.length) | 0], 0.85 + r() * 0.3);
         g.fillRect(x, y + 28 - h, w, h);
         g.fillStyle = 'rgba(255,255,255,.35)';
-        g.fillRect(x + 1, y + 31 - h, w - 2, 1.5); // タイトル箔
-        x += w + 1 + (r() < 0.12 ? 6 : 0); // ときどき本の抜けた隙間
+        g.fillRect(x + 1, y + 31 - h, w - 2, 1.5);
+        x += w + 1 + (r() < 0.12 ? 6 : 0);
       }
-      g.fillStyle = css(c, 1.2); g.fillRect(0, y + 28, S, 4); // 棚板
+      g.fillStyle = css(c, 1.2); g.fillRect(0, y + 28, S, 4);
     }
   },
-  // 陳列棚: 商品パッケージの列 (スーパー/ドラッグストア/100均)
   goods(g, S, r, c) {
     g.fillStyle = css(c, 0.8); g.fillRect(0, 0, S, S);
     for (let row = 0; row < 4; row++) {
@@ -205,38 +185,35 @@ const ART_DRAW = {
         g.fillStyle = css(PACKS[(r() * PACKS.length) | 0], 0.9 + r() * 0.25);
         g.fillRect(x, y + 27 - h, w, h);
         g.fillStyle = 'rgba(255,255,255,.7)';
-        g.fillRect(x + 1, y + 27 - h * 0.45, w - 2, 3); // ラベル帯
+        g.fillRect(x + 1, y + 27 - h * 0.45, w - 2, 3);
         x += w + 2;
       }
-      g.fillStyle = css(c, 1.22); g.fillRect(0, y + 27, S, 5); // 棚板
+      g.fillStyle = css(c, 1.22); g.fillRect(0, y + 27, S, 5);
     }
   },
-  // ロッカー/下駄箱: 扉のグリッド + 取っ手 + 通気スリット
   locker(g, S, r, c) {
     g.fillStyle = css(c, 0.65); g.fillRect(0, 0, S, S);
     for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
       g.fillStyle = css(c, 1.0 + ((i * 4 + j) % 3) * 0.07);
       g.fillRect(i * 32 + 1.5, j * 32 + 1.5, 29, 29);
       g.fillStyle = 'rgba(30,30,35,.5)';
-      g.fillRect(i * 32 + 24, j * 32 + 13, 4, 6); // 取っ手
+      g.fillRect(i * 32 + 24, j * 32 + 13, 4, 6);
       g.fillStyle = 'rgba(30,30,35,.25)';
-      for (let v = 0; v < 3; v++) g.fillRect(i * 32 + 7, j * 32 + 5 + v * 3, 14, 1.2); // スリット
+      for (let v = 0; v < 3; v++) g.fillRect(i * 32 + 7, j * 32 + 5 + v * 3, 14, 1.2);
     }
   },
-  // 自販機: ドリンク見本窓 + 金額パネル + 取り出し口 (2mごとに1台)
   vend(g, S, r, c) {
     g.fillStyle = css(c, 0.95); g.fillRect(0, 0, S, S);
-    g.fillStyle = 'rgba(15,15,25,.9)'; g.fillRect(10, 8, S - 20, 62); // 見本窓
+    g.fillStyle = 'rgba(15,15,25,.9)'; g.fillRect(10, 8, S - 20, 62);
     for (let row = 0; row < 2; row++) for (let i = 0; i < 6; i++) {
       g.fillStyle = css(PACKS[(r() * PACKS.length) | 0]);
       g.fillRect(15 + i * 17, 14 + row * 28, 12, 20);
       g.fillStyle = 'rgba(255,255,255,.6)';
       g.fillRect(15 + i * 17, 22 + row * 28, 12, 3);
     }
-    g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(10, 76, S - 20, 10);  // 金額パネル
-    g.fillStyle = 'rgba(15,15,25,.85)'; g.fillRect(24, 96, S - 48, 22);     // 取り出し口
+    g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(10, 76, S - 20, 10);
+    g.fillStyle = 'rgba(15,15,25,.85)'; g.fillRect(24, 96, S - 48, 22);
   },
-  // 黒板: チョークの板書
   board(g, S, r, c) {
     g.fillStyle = css(c); g.fillRect(0, 0, S, S);
     for (let row = 0; row < 5; row++) {
@@ -253,7 +230,6 @@ const ART_DRAW = {
       }
     }
   },
-  // 掲示板: コルク地 + 画鋲で貼られたお知らせ
   poster(g, S, r, c) {
     g.fillStyle = css(c, 0.9); g.fillRect(0, 0, S, S);
     for (let i = 0; i < 260; i++) { g.fillStyle = `rgba(120,90,60,${0.05 + r() * 0.08})`; g.fillRect(r() * S, r() * S, 2, 2); }
@@ -266,12 +242,11 @@ const ART_DRAW = {
       g.fillStyle = css(paper[(r() * paper.length) | 0]);
       g.fillRect(-w / 2, -h / 2, w, h);
       g.fillStyle = 'rgba(60,60,70,.55)';
-      for (let l = 0; l < 4; l++) g.fillRect(-w / 2 + 3, -h / 2 + 5 + l * 5, w - 6 - r() * 8, 1.6); // 文字の行
-      g.fillStyle = '#d04040'; g.beginPath(); g.arc(0, -h / 2 + 2, 2, 0, 6.3); g.fill(); // 画鋲
+      for (let l = 0; l < 4; l++) g.fillRect(-w / 2 + 3, -h / 2 + 5 + l * 5, w - 6 - r() * 8, 1.6);
+      g.fillStyle = '#d04040'; g.beginPath(); g.arc(0, -h / 2 + 2, 2, 0, 6.3); g.fill();
       g.restore();
     }
   },
-  // 畳: い草の織り目 + 畳縁
   tatami(g, S, r, c) {
     g.fillStyle = css(c); g.fillRect(0, 0, S, S);
     for (let x = 0; x < S; x += 2) {
@@ -279,30 +254,28 @@ const ART_DRAW = {
       g.fillRect(x, 0, 1, S);
     }
     g.fillStyle = 'rgba(35,45,35,.8)';
-    g.fillRect(0, 0, S, 5); g.fillRect(0, 62, S, 5); // 縁 (1mごと)
+    g.fillRect(0, 0, S, 5); g.fillRect(0, 62, S, 5);
   },
-  // 窓ガラス: サッシ格子 + 空の映り込み
   glass(g, S, r, c) {
     const grad = g.createLinearGradient(0, 0, S, S);
     grad.addColorStop(0, css(c, 1.15)); grad.addColorStop(0.5, css(c, 0.85)); grad.addColorStop(1, css(c, 1.05));
     g.fillStyle = grad; g.fillRect(0, 0, S, S);
     g.strokeStyle = 'rgba(255,255,255,.45)'; g.lineWidth = 3;
-    for (let i = 0; i < 3; i++) { // 斜めの反射
+    for (let i = 0; i < 3; i++) {
       g.beginPath(); g.moveTo(20 + i * 34, 0); g.lineTo(-10 + i * 34, S); g.stroke();
     }
     g.fillStyle = 'rgba(245,248,250,.95)';
-    for (let k = 0; k <= 2; k++) { g.fillRect(k * 63, 0, 3, S); g.fillRect(0, k * 63, S, 3); } // サッシ (1mごと)
+    for (let k = 0; k <= 2; k++) { g.fillRect(k * 63, 0, 3, S); g.fillRect(0, k * 63, S, 3); }
   },
-  // ゲーム筐体: マーキー + 画面のドット絵 + ボタン
   arcade(g, S, r, c) {
     g.fillStyle = css(c, 0.55); g.fillRect(0, 0, S, S);
-    g.fillStyle = css(c, 1.25); g.fillRect(0, 0, S, 14);   // マーキー
-    g.fillStyle = '#101828'; g.fillRect(16, 20, S - 32, 54); // 画面
+    g.fillStyle = css(c, 1.25); g.fillRect(0, 0, S, 14);
+    g.fillStyle = '#101828'; g.fillRect(16, 20, S - 32, 54);
     for (let i = 0; i < 26; i++) {
       g.fillStyle = css(PACKS[(r() * PACKS.length) | 0]);
       g.fillRect(20 + r() * (S - 44), 24 + r() * 46, 4, 4);
     }
-    g.fillStyle = css(c, 0.9); g.fillRect(10, 84, S - 20, 24); // 操作台
+    g.fillStyle = css(c, 0.9); g.fillRect(10, 84, S - 20, 24);
     const btn = [0xe04040, 0xf0d040, 0x40a0e0, 0x50c060];
     for (let i = 0; i < 4; i++) {
       g.fillStyle = css(btn[i]);
@@ -312,7 +285,7 @@ const ART_DRAW = {
 };
 
 function texFor(m, c) {
-  if (m === 'sign') return null; // 看板は発光パネルなので無地のまま
+  if (m === 'sign') return null;
   const art = ART_DRAW[m];
   const key = art ? m + '|' + c : (TEX_DRAW[m] ? m : 'stone');
   if (texCache.has(key)) return texCache.get(key);
@@ -331,12 +304,9 @@ function texFor(m, c) {
   return entry;
 }
 
-// BoxGeometryのUVを実寸に合わせて伸ばし、テクスチャ密度を全ボックスで均一にする
-// (1タイル=2m)。ボックスごとに位相をずらして繰り返しの単調さを消す。
 const UV_K = 0.5;
 function scaleBoxUV(geo, b) {
   const uv = geo.attributes.uv;
-  // 絵付き材質は絵の切れ目が棚板等とずれないよう位相をずらさない
   const art = !!ART_DRAW[b.m];
   const ou = art ? 0 : (b.x * 0.37 + b.y * 0.11) % 1, ov = art ? 0 : (b.z * 0.37 + b.y * 0.13) % 1;
   const dims = [[b.d, b.h], [b.d, b.h], [b.w, b.d], [b.w, b.d], [b.w, b.h], [b.w, b.h]]; // +x,-x,+y,-y,+z,-z
@@ -354,7 +324,6 @@ export function buildWorld(scene, mapId, quality) {
   const group = new THREE.Group();
   const solids = solidsOf(map);
 
-  // 色+材質ごとにジオメトリをマージして描画コールを削減
   const buckets = new Map();
   for (const b of map.boxes) {
     if (b.w <= 0 || b.h <= 0 || b.d <= 0) continue;
@@ -378,9 +347,9 @@ export function buildWorld(scene, mapId, quality) {
     const entry = texFor(m, parseInt(c));
     if (entry) {
       params.map = entry.tex;
-      if (entry.full) params.color = 0xffffff; // 絵付きは実色で描いてあるので白 (乗算なし)
+      if (entry.full) params.color = 0xffffff;
       if (glow === '1') {
-        params.emissiveMap = entry.tex; // 発光にも模様を通して質感を保つ
+        params.emissiveMap = entry.tex;
         if (entry.full) { params.emissive = 0xffffff; params.emissiveIntensity = 0.4; }
       }
     }
@@ -392,7 +361,6 @@ export function buildWorld(scene, mapId, quality) {
   }
   scene.add(group);
 
-  // 環境光・太陽光・フォグ・空
   scene.background = new THREE.Color(map.sky);
   scene.fog = new THREE.Fog(map.fog.color, map.fog.near, map.fog.far);
   const hemi = new THREE.HemisphereLight(0xffffff, 0x334455, map.ambient);
@@ -407,14 +375,12 @@ export function buildWorld(scene, mapId, quality) {
     sun.shadow.bias = -0.0005;
   }
   scene.add(sun);
-  // マップ固有のポイントライト (洞窟のクリスタルなど)
   const maxLights = quality.high ? 8 : 4;
   for (const l of (map.lights || []).slice(0, maxLights)) {
     const pl = new THREE.PointLight(l.c, l.i, l.d, 1.8);
     pl.position.set(l.x, l.y, l.z);
     scene.add(pl);
   }
-  // 牢屋のマーカー (光る床)
   const jail = map.jail;
   const jm = new THREE.Mesh(
     new THREE.PlaneGeometry(jail.w, jail.d),
@@ -427,7 +393,6 @@ export function buildWorld(scene, mapId, quality) {
   return { map, group, solids };
 }
 
-// カメラの壁めり込み防止: 注視点→カメラ位置の間に遮蔽があれば手前に寄せる
 export function clampCamera(from, to, solids) {
   const dir = to.clone().sub(from);
   const len = dir.length();

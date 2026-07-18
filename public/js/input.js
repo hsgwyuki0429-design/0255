@@ -1,5 +1,3 @@
-// 入力: 左半分=仮想スティック / 右下=ダッシュボタン / 右半分タップ=ジャンプ / 右半分ドラッグ=カメラ
-// PC: WASD+Space+マウスドラッグ
 export class Input {
   constructor() {
     this.move = { x: 0, y: 0 };     // -1..1
@@ -13,7 +11,7 @@ export class Input {
     this.lookLast = { x: 0, y: 0 };
     this.lookMoved = 0;
     this.lookStart = 0;
-    this.lastLookT = 0;      // 最後にスワイプ/ドラッグで視点を動かした時刻
+    this.lastLookT = 0;
     this.sprintTouch = false;
     this.enabled = false;
   }
@@ -24,7 +22,6 @@ export class Input {
     const base = document.getElementById('stick-base');
     const knob = document.getElementById('stick-knob');
 
-    // ---- 左: 仮想スティック (触れた場所が原点になる動的スティック) ----
     stickZone.addEventListener('touchstart', e => {
       if (!this.enabled) return;
       e.preventDefault();
@@ -61,7 +58,6 @@ export class Input {
     stickZone.addEventListener('touchend', stickEnd);
     stickZone.addEventListener('touchcancel', stickEnd);
 
-    // ---- 右: タップ=ジャンプ / ドラッグ=カメラ ----
     rightZone.addEventListener('touchstart', e => {
       if (!this.enabled) return;
       e.preventDefault();
@@ -87,7 +83,6 @@ export class Input {
     const lookEnd = e => {
       for (const t of e.changedTouches) {
         if (t.identifier !== this.lookId) continue;
-        // 小さい動きの短いタッチ = ジャンプ
         if (this.lookMoved < 14 && performance.now() - this.lookStart < 260) this.jumpQueued = true;
         this.lookId = null;
       }
@@ -95,7 +90,6 @@ export class Input {
     rightZone.addEventListener('touchend', lookEnd);
     rightZone.addEventListener('touchcancel', lookEnd);
 
-    // ---- ダッシュボタン (モバイル: 押している間ダッシュ) ----
     const dashBtn = document.getElementById('btn-dash');
     if (dashBtn) {
       dashBtn.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); this.sprintTouch = true; }, { passive: false });
@@ -106,13 +100,11 @@ export class Input {
       window.addEventListener('mouseup', () => { this.sprintTouch = false; });
     }
 
-    // ---- PC: キーボード + マウス ----
     window.addEventListener('keydown', e => {
       this.keys[e.code] = true;
       if (e.code === 'Space' && this.enabled) { this.jumpQueued = true; e.preventDefault(); }
     });
     window.addEventListener('keyup', e => { this.keys[e.code] = false; });
-    // マウスはタッチゾーンのdivに遮られるため window で拾う
     let mouseDown = false, lastM = null;
     window.addEventListener('mousedown', e => {
       if (!this.enabled || this.isTouch) return;
@@ -130,7 +122,6 @@ export class Input {
     window.addEventListener('mouseup', () => { mouseDown = false; });
   }
 
-  // キーボードの移動を合成して返す
   getMove() {
     let x = this.move.x, y = this.move.y;
     if (this.keys['KeyW'] || this.keys['ArrowUp']) y -= 1;
