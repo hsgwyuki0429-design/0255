@@ -46,7 +46,7 @@ export function buildWorld(scene, mapId, quality) {
   if (quality.shadows) {
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    const S = 55;
+    const S = 75;
     Object.assign(sun.shadow.camera, { left: -S, right: S, top: S, bottom: -S, near: 5, far: 120 });
     sun.shadow.bias = -0.0005;
   }

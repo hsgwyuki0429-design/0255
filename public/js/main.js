@@ -214,7 +214,7 @@ function initRenderer() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, input.isTouch ? 2 : 2));
   renderer.shadowMap.enabled = !input.isTouch;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  camera = new THREE.PerspectiveCamera(140, innerWidth / innerHeight, 0.1, 200); // 視野を従来(70)の2倍に
+  camera = new THREE.PerspectiveCamera(140, innerWidth / innerHeight, 0.1, 320); // 視野を従来(70)の2倍に
   window.addEventListener('resize', () => {
     renderer.setSize(innerWidth, innerHeight);
     camera.aspect = innerWidth / innerHeight;
@@ -264,14 +264,15 @@ function startGame(data) {
     onGround: true,
     endsAt: Date.now() + data.timeLimit * 1000,
     graceUntil: Date.now() + Math.max(0, data.graceUntil - (data.endsAt - data.timeLimit * 1000)),
-    lastSend: 0, lastTouch: 0, lastShot: 0, stepAcc: 0, stepAlt: false,
-    over: false, aiming: false,
+    lastSend: 0, lastTouch: 0, stepAcc: 0, stepAlt: false,
+    over: false,
     stamina: 100, stamLock: false,      // ダッシュ用スタミナ
     camEyeY: data.you.pos[1]            // カメラ高さは階段でガタつかないよう平滑化
   };
   game.camYaw = game.yaw - Math.PI;
   meR.hum.root.position.copy(game.pos);
   if (meR.hum.tag) meR.hum.tag.visible = false; // 自分の名札は非表示
+  applyViewMode();
 
   updateRoleHUD();
   updateCountHUD();
@@ -289,10 +290,27 @@ function updateRoleHUD() {
   const el = $('hud-role');
   if (game.role === 'oni') { el.textContent = '👹 鬼'; el.className = 'hud-role'; }
   else { el.textContent = '🏃 逃げ'; el.className = 'hud-role run'; }
-  $('btn-shoot').classList.toggle('hidden', game.role !== 'oni');
   $('jump-hint').textContent = input.isTouch ? '右側タップでジャンプ' : 'Space=ジャンプ / Shift=ダッシュ';
   $('btn-dash').style.display = input.isTouch ? '' : 'none';
 }
+
+// ---------------- 視点切替 (一人称/三人称) ----------------
+let viewMode = localStorage.getItem('oni-view') || 'tp'; // 'tp'=三人称 / 'fp'=一人称
+function applyViewMode() {
+  $('btn-view').textContent = viewMode === 'fp' ? '👁 一人称' : '🎥 三人称';
+  if (game) {
+    const meR = game.remotes.get(game.meId);
+    if (meR) meR.hum.root.visible = viewMode !== 'fp'; // 一人称では自分の体を消す
+  }
+}
+$('btn-view').addEventListener('click', e => { e.stopPropagation(); toggleView(); });
+$('btn-view').addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); toggleView(); }, { passive: false });
+function toggleView() {
+  viewMode = viewMode === 'fp' ? 'tp' : 'fp';
+  localStorage.setItem('oni-view', viewMode);
+  applyViewMode();
+}
+applyViewMode();
 function updateCountHUD() {
   if (!game) return;
   const rs = [...game.remotes.values()].filter(r => r.role === 'run');
@@ -342,15 +360,6 @@ net.on('ev', ev => {
     SFX.hit();
   };
   switch (ev.type) {
-    case 'shot': {
-      SFX.shoot();
-      const shooter = game.remotes.get(ev.id);
-      const ink = shooter ? shooter.hum.color : 0xffee55;
-      vfx.tracer(ev.p, ev.d, ink);
-      vfx.bullet(ev.p, ev.d, ink);           // 弾を描画 (ペイント弾)
-      if (shooter) shooter.hum.triggerShoot();
-      break;
-    }
     case 'jailed': {
       SFX.jailed();
       paintOn(r, ev.by);
@@ -497,7 +506,10 @@ function loop(t) {
   // ---- カメラ回転 (スワイプ/ドラッグ) ----
   const look = input.consumeLook();
   g.camYaw -= look.dx * 0.0042; // 右ドラッグ=右を向く (three.jsは+z向き時+xが左)
-  g.camPitch = THREE.MathUtils.clamp(g.camPitch + look.dy * 0.0035, -0.5, 1.1);
+  const fp = viewMode === 'fp';
+  g.camPitch = fp
+    ? THREE.MathUtils.clamp(g.camPitch + look.dy * 0.0035, -1.25, 1.25)
+    : THREE.MathUtils.clamp(g.camPitch + look.dy * 0.0035, -0.5, 1.1);
 
   // ---- ダッシュ & スタミナ ----
   const mv = input.getMove();
@@ -583,35 +595,6 @@ function loop(t) {
     if (g.stepAcc > 2.1) { g.stepAcc = 0; g.stepAlt = !g.stepAlt; SFX.step(g.stepAlt); }
   }
 
-  // ---- 射撃 (鬼のみ) ----
-  g.aiming = false;
-  if (input.consumeShoot() && g.role === 'oni' && !locked) {
-    if (now - g.lastShot > 900) {
-      g.lastShot = now;
-      const dir = new THREE.Vector3(Math.sin(g.yaw), 0, Math.cos(g.yaw));
-      // 軽いオートエイム: 前方±35° 2.2m以内の最も近い逃げへ向ける
-      let best = null, bestD = 2.3;
-      for (const r of g.remotes.values()) {
-        if (r.id === g.meId || r.role !== 'run' || r.jailed || r.frozen) continue;
-        tmpV.copy(r.hum.root.position).sub(g.pos);
-        const d = tmpV.length();
-        if (d > bestD) continue;
-        tmpV.normalize();
-        if (tmpV.dot(dir) > 0.8) { best = tmpV.clone(); bestD = d; }
-      }
-      const shootDir = best || dir;
-      const origin = [g.pos.x + shootDir.x * 0.3, g.pos.y + 1.25, g.pos.z + shootDir.z * 0.3];
-      net.shoot(origin, [shootDir.x, shootDir.y ?? 0, shootDir.z]);
-      meR.hum.triggerShoot();
-      const btn = $('btn-shoot');
-      btn.classList.add('cd');
-      setTimeout(() => btn.classList.remove('cd'), 900);
-    } else {
-      SFX.denied();
-    }
-  }
-  if (g.role === 'oni' && now - g.lastShot < 350) g.aiming = true;
-
   // ---- 救出 / 氷とかし (逃げが拘束された味方に近づいてタップ or 自動) ----
   let touchTarget = null;
   if (g.role === 'run' && !g.jailed && !g.frozen && !g.over) {
@@ -632,7 +615,7 @@ function loop(t) {
   meR.hum.root.position.copy(g.pos);
   meR.hum.root.rotation.y = g.yaw;
   meR.hum.setFrozen(g.frozen);
-  meR.hum.update({ dt, speed: hSpeed, velY: g.vel.y, onGround: g.onGround, aiming: g.aiming, frozen: g.frozen, jailed: g.jailed });
+  meR.hum.update({ dt, speed: hSpeed, velY: g.vel.y, onGround: g.onGround, frozen: g.frozen, jailed: g.jailed });
 
   // ---- リモートプレイヤー補間 (100ms遅延再生) ----
   const renderT = now - 130;
@@ -665,7 +648,7 @@ function loop(t) {
     r.lastY = ty;
     r.hum.root.position.copy(r.cur);
     r.hum.root.rotation.y = r.ry;
-    r.hum.update({ dt, speed: r.speed, velY: (ty - prev.y) / Math.max(dt, 0.001), onGround: r.onG, aiming: false, frozen: r.frozen, jailed: r.jailed });
+    r.hum.update({ dt, speed: r.speed, velY: (ty - prev.y) / Math.max(dt, 0.001), onGround: r.onG, frozen: r.frozen, jailed: r.jailed });
   }
 
   // ---- カメラ ----
@@ -673,16 +656,29 @@ function loop(t) {
   const eyeFollow = g.onGround ? 9 : 25; // 空中(ジャンプ/落下)は素早く追従
   g.camEyeY += (g.pos.y - g.camEyeY) * Math.min(1, dt * eyeFollow);
   if (Math.abs(g.pos.y - g.camEyeY) > 2.5) g.camEyeY = g.pos.y; // 大きく離れたら追い付く
-  // キャラが半分サイズ + 広角(FOV 2倍)になったので、注視点を低く・カメラを近くして収まりを合わせる
-  const eye = tmpV.set(g.pos.x, g.camEyeY + 0.95, g.pos.z).clone();
-  const dist = 2.8;
-  const cx = eye.x - Math.sin(g.camYaw + Math.PI) * Math.cos(g.camPitch) * dist;
-  const cz = eye.z - Math.cos(g.camYaw + Math.PI) * Math.cos(g.camPitch) * dist;
-  const cy = eye.y + Math.sin(g.camPitch) * dist;
-  let camPos = new THREE.Vector3(cx, cy, cz);
-  camPos = clampCamera(eye, camPos, g.solids);
-  camera.position.lerp(camPos, Math.min(1, dt * 14));
-  camera.lookAt(eye);
+  if (fp) {
+    // ---- 一人称: 目の位置にカメラを置き、視線方向をそのまま見る ----
+    const eye = tmpV.set(g.pos.x, g.camEyeY + 0.78, g.pos.z).clone();
+    const fyaw = g.camYaw + Math.PI; // カメラは自分の背後基準なので前方へ反転
+    const look = new THREE.Vector3(
+      eye.x + Math.sin(fyaw) * Math.cos(g.camPitch),
+      eye.y - Math.sin(g.camPitch),
+      eye.z + Math.cos(fyaw) * Math.cos(g.camPitch)
+    );
+    camera.position.copy(eye);
+    camera.lookAt(look);
+  } else {
+    // ---- 三人称: 背後から見下ろす (壁めり込み防止つき) ----
+    const eye = tmpV.set(g.pos.x, g.camEyeY + 0.95, g.pos.z).clone();
+    const dist = 2.8;
+    const cx = eye.x - Math.sin(g.camYaw + Math.PI) * Math.cos(g.camPitch) * dist;
+    const cz = eye.z - Math.cos(g.camYaw + Math.PI) * Math.cos(g.camPitch) * dist;
+    const cy = eye.y + Math.sin(g.camPitch) * dist;
+    let camPos = new THREE.Vector3(cx, cy, cz);
+    camPos = clampCamera(eye, camPos, g.solids);
+    camera.position.lerp(camPos, Math.min(1, dt * 14));
+    camera.lookAt(eye);
+  }
 
   // ---- HUD ----
   const remain = Math.max(0, g.endsAt - now);

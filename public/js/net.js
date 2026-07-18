@@ -18,7 +18,6 @@ export class Net {
   setOpts(opts) { this.socket.emit('setOpts', opts); }
   startGame() { this.socket.emit('startGame'); }
   sendState(s) { this.socket.volatile.emit('state', s); }
-  shoot(p, d) { this.socket.emit('shoot', { p, d }); }
   touchPlayer(targetId) { this.socket.emit('touchPlayer', { targetId }); }
   ask(ev, data) {
     return new Promise(res => {
