@@ -111,8 +111,8 @@ input, select { font-family: inherit; }
   #hud-timer { font-size: 20px; min-width: 58px; }
   #hud-count { font-size: 12px; }
 }
-#minimap { position: absolute; right: max(10px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); width: 150px; height: 150px; border-radius: 14px; border: 2px solid #ffffff33; background: #000a; }
-@media (min-width: 800px) { #minimap { width: 200px; height: 200px; } }
+#minimap { position: absolute; right: max(10px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%); width: 96px; height: 96px; border-radius: 12px; border: 1px solid #ffffff22; background: transparent; opacity: 0.62; }
+@media (min-width: 800px) { #minimap { width: 132px; height: 132px; } }
 #hud-msg { position: absolute; top: 18%; left: 50%; transform: translateX(-50%); width: 90%; max-width: 500px; text-align: center; display: flex; flex-direction: column; gap: 4px; align-items: center; }
 .msg-line { background: #000b; border-radius: 10px; padding: 6px 14px; font-size: 14px; font-weight: 700; animation: msgin .25s; }
 @keyframes msgin { from { transform: translateY(-8px); opacity: 0; } }

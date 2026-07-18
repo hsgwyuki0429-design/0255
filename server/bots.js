@@ -62,7 +62,7 @@ export class BotBrain {
     this.jitter = Math.random() * 1000;
   }
 
-  // 対象の移動速度を推定 (偏差撃ち・先回り用)
+  // 対象の移動速度を推定 (先回り用)
   velOf(tp, now) {
     const prev = this.tprev.get(tp.id);
     this.tprev.set(tp.id, { x: tp.pos[0], z: tp.pos[2], t: now });

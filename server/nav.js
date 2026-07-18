@@ -223,7 +223,7 @@ export class NavGrid {
   }
 }
 
-// solid AABBによる視線判定 (射撃用): o→t の間に遮蔽があるか
+// solid AABBによる視線判定: o→t の間に遮蔽があるか
 export function losBlocked(o, t, solids) {
   const dx = t[0] - o[0], dy = t[1] - o[1], dz = t[2] - o[2];
   const len = Math.hypot(dx, dy, dz);

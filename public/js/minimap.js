@@ -22,7 +22,7 @@ export class Minimap {
     if (!this.map) return;
     const ctx = this.ctx, s = this.scale;
     ctx.clearRect(0, 0, this.cv.width, this.cv.height);
-    ctx.fillStyle = '#0a0f1add';
+    ctx.fillStyle = '#0a0f1a88'; // 半透明 (背後のゲーム画面が透ける)
     ctx.fillRect(0, 0, this.cv.width, this.cv.height);
     // 自分がいる高さ周辺の壁だけ描く (今いるフロアの間取りが見える)
     ctx.fillStyle = '#8899bb55';

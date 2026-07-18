@@ -410,7 +410,7 @@ net.on('ev', ev => {
     }
     case 'swapped': {
       SFX.swapped();
-      if (ev.newRun) paintOn(game.remotes.get(ev.newOni), ev.newRun); // 撃った側のインクが付く
+      if (ev.newRun) paintOn(game.remotes.get(ev.newOni), ev.newRun); // タッチした側のインクが付く
       const no = game.remotes.get(ev.newOni), nr = ev.newRun ? game.remotes.get(ev.newRun) : null;
       if (no) { no.role = 'oni'; no.hum.setRole('oni'); vfx.burst(no.hum.root.position.clone().add(new THREE.Vector3(0, 1, 0)), 0xff4444); }
       if (nr) { nr.role = 'run'; nr.hum.setRole('run'); }
