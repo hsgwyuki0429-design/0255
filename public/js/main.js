@@ -301,6 +301,58 @@ function toggleView() {
 }
 applyViewMode();
 
+// ---- 設定 (ジャイロ / 視点感度) ----
+let lookSens = parseFloat(localStorage.getItem('oni-sens')) || 1;
+input.gyroSens = lookSens;
+function applySensLabel() { const el = $('sens-val'); if (el) el.textContent = lookSens.toFixed(1) + '×'; }
+$('set-sens').value = lookSens;
+$('set-sens').oninput = e => {
+  lookSens = parseFloat(e.target.value) || 1;
+  input.gyroSens = lookSens;
+  localStorage.setItem('oni-sens', String(lookSens));
+  applySensLabel();
+};
+applySensLabel();
+
+const gyroChk = $('set-gyro');
+gyroChk.checked = localStorage.getItem('oni-gyro') === 'on';
+async function refreshGyro(request) {
+  if (gyroChk.checked) {
+    // request=true のときだけ許可リクエスト(ユーザー操作起点で呼ぶ)
+    const ok = request ? await input.enableGyro() : (input.gyro = true, true);
+    if (!ok) {
+      gyroChk.checked = false;
+      input.disableGyro();
+      localStorage.setItem('oni-gyro', 'off');
+      toast('ジャイロを有効にできませんでした(端末が非対応か許可されていません)');
+      return;
+    }
+    localStorage.setItem('oni-gyro', 'on');
+  } else {
+    input.disableGyro();
+    localStorage.setItem('oni-gyro', 'off');
+  }
+}
+gyroChk.onchange = () => refreshGyro(true);
+// 保存済みでオンの復元: iOS(要許可)は最初のユーザー操作で許可取得、それ以外は即有効化
+const GYRO_NEEDS_PERM = window.DeviceOrientationEvent && typeof window.DeviceOrientationEvent.requestPermission === 'function';
+if (gyroChk.checked) {
+  if (GYRO_NEEDS_PERM) {
+    input.gyro = false;
+    const armGyro = async () => {
+      const ok = await input.enableGyro();
+      if (!ok) { gyroChk.checked = false; localStorage.setItem('oni-gyro', 'off'); }
+    };
+    window.addEventListener('touchend', armGyro, { once: true });
+    window.addEventListener('click', armGyro, { once: true });
+  } else {
+    input.enableGyro();
+  }
+}
+
+$('btn-settings').onclick = e => { e.stopPropagation(); $('modal-settings').classList.remove('hidden'); };
+$('set-close').onclick = () => $('modal-settings').classList.add('hidden');
+
 function applyMuteBtn() { $('btn-mute').textContent = isMuted() ? '🔇' : '🔊'; }
 function toggleMute() { setMuted(!isMuted()); applyMuteBtn(); }
 $('btn-mute').addEventListener('click', e => { e.stopPropagation(); toggleMute(); });
@@ -526,11 +578,12 @@ function loop(t) {
   const inGrace = now < g.graceUntil;
 
   const look = input.consumeLook();
-  g.camYaw -= look.dx * 0.0042;
+  g.camYaw -= look.dx * 0.0042 * lookSens;
   const fp = viewMode === 'fp';
+  const pitchDelta = look.dy * 0.0035 * lookSens;
   g.camPitch = fp
-    ? THREE.MathUtils.clamp(g.camPitch + look.dy * 0.0035, -1.25, 1.25)
-    : THREE.MathUtils.clamp(g.camPitch + look.dy * 0.0035, -0.5, 1.1);
+    ? THREE.MathUtils.clamp(g.camPitch + pitchDelta, -1.25, 1.25)
+    : THREE.MathUtils.clamp(g.camPitch + pitchDelta, -0.5, 1.1);
 
   const mv = input.getMove();
   const moving = !!(mv.x || mv.y);
