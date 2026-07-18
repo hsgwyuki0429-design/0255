@@ -67,7 +67,10 @@ input::placeholder { color: var(--ink-3); }
 }
 
 .home-cols { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; flex: 1; min-height: 0; }
-@media (max-width: 640px) { .home-cols { grid-template-columns: 1fr; } }
+/* 縦積み時: flex:1(=1 1 0%)だと縦が縮んだSafariでcolsが内容より潰れ、
+   中のパネルがはみ出してボタンに重なる。縮まない(shrink:0)よう固定し、
+   はみ出す分は .home-inner のスクロールに逃がす */
+@media (max-width: 640px) { .home-cols { grid-template-columns: 1fr; flex: 1 0 auto; } }
 .panel { background: var(--fill); border: none; border-radius: 20px; padding: 24px;
   display: flex; flex-direction: column; min-height: 160px; }
 .panel-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
