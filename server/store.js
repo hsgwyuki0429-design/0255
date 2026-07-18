@@ -1,4 +1,3 @@
-// レート永続化ストア: Supabase があれば Supabase、なければローカルJSONにフォールバック
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -28,7 +27,6 @@ function saveFile(db) {
   } catch (e) { console.error('[store] file save error', e.message); }
 }
 
-// プレイヤー取得(なければ rating=1000 で作成)。cpuRating = CPU戦専用レート
 export async function getPlayer(deviceId, name) {
   if (supabase) {
     try {
@@ -49,7 +47,6 @@ export async function getPlayer(deviceId, name) {
   return { rating: db[deviceId].rating, cpuRating: db[deviceId].cpuRating ?? 1000, games: db[deviceId].games, wins: db[deviceId].wins };
 }
 
-// CPU戦の結果保存 (CPU専用レートのみ更新)
 export async function saveCpuResult(deviceId, name, cpuRating) {
   if (!deviceId) return;
   if (supabase) {
@@ -67,7 +64,6 @@ export async function saveCpuResult(deviceId, name, cpuRating) {
   saveFile(db);
 }
 
-// 試合結果保存: results = [{deviceId, name, rating(新), win, delta}]
 export async function saveResults(results) {
   if (supabase) {
     try {
@@ -91,7 +87,6 @@ export async function saveResults(results) {
   saveFile(db);
 }
 
-// ランキング上位取得 (ホーム画面用)
 export async function topPlayers(limit = 10) {
   if (supabase) {
     try {

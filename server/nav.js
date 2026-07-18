@@ -1,15 +1,12 @@
 // ============================================================
-// CPUボット用ナビゲーション: マップのAABBから多層グリッドを構築し、
-// A* で経路探索する。段差(≤0.45)は歩行、(≤1.05)はジャンプ、
-// 下り(≤3.8)は飛び降りとして接続する。
 // ============================================================
 
-const CELL = 0.6;        // グリッド解像度
-const CLEAR = 1.75;      // 必要な頭上クリアランス
-const WALK_DH = 0.45;    // 歩いて越えられる段差
-const JUMP_DH = 1.05;    // ジャンプで越えられる段差
-const DROP_DH = 3.8;     // 飛び降りられる高さ
-const MAXL = 6;          // 1セルあたり最大レベル数
+const CELL = 0.6;
+const CLEAR = 1.75;
+const WALK_DH = 0.45;
+const JUMP_DH = 1.05;
+const DROP_DH = 3.8;
+const MAXL = 6;
 
 export class NavGrid {
   constructor(map, solids) {
@@ -17,13 +14,12 @@ export class NavGrid {
     this.minX = b.minX; this.minZ = b.minZ;
     this.nx = Math.ceil((b.maxX - b.minX) / CELL);
     this.nz = Math.ceil((b.maxZ - b.minZ) / CELL);
-    this.levels = new Array(this.nx * this.nz); // 各セルの歩行面高さの配列
+    this.levels = new Array(this.nx * this.nz);
     this.build(solids);
   }
 
   build(solids) {
     const r = 0.3;
-    // セルごとに重なるsolidを高速に引けるよう列バケツ化
     const colBuckets = new Array(this.nx);
     for (let i = 0; i < this.nx; i++) colBuckets[i] = [];
     for (const s of solids) {
@@ -39,7 +35,6 @@ export class NavGrid {
         for (const s of colBuckets[i]) {
           if (cz + r > s.minZ && cz - r < s.maxZ) near.push(s);
         }
-        // 床候補: セル中心の直下にあるsolidの上面 (0m=地面も候補)
         const cands = [0];
         for (const s of near) {
           if (cx > s.minX - 0.15 && cx < s.maxX + 0.15 && cz > s.minZ - 0.15 && cz < s.maxZ + 0.15) {
@@ -49,8 +44,7 @@ export class NavGrid {
         cands.sort((a, b) => a - b);
         const lv = [];
         for (const h of cands) {
-          if (lv.length && h - lv[lv.length - 1] < 0.3) continue; // 近接候補は統合
-          // クリアランス: h+0.45〜h+CLEAR の帯に食い込むsolidがあれば立てない
+          if (lv.length && h - lv[lv.length - 1] < 0.3) continue;
           let ok = true;
           for (const s of near) {
             if (s.minY < h + CLEAR && s.maxY > h + 0.45 &&
@@ -70,7 +64,6 @@ export class NavGrid {
     return [i, j];
   }
 
-  // 位置に最も近い歩行面 (セル+レベルindex) を探す
   sample(x, y, z, radius = 2) {
     const c = this.cellOf(x, z);
     const tryCell = (i, j) => {
@@ -84,7 +77,6 @@ export class NavGrid {
       return best === null ? null : { i, j, li: best, h: lv[best] };
     };
     if (c) { const n = tryCell(c[0], c[1]); if (n) return n; }
-    // 近傍探索
     const ci = c ? c[0] : Math.round((x - this.minX) / CELL), cj = c ? c[1] : Math.round((z - this.minZ) / CELL);
     const R = Math.ceil(radius / CELL);
     for (let ring = 1; ring <= R; ring++) {
@@ -107,7 +99,6 @@ export class NavGrid {
     };
   }
 
-  // ランダムな歩行可能地点 (徘徊用)
   randomPointNear(x, y, z, radius) {
     for (let t = 0; t < 24; t++) {
       const a = Math.random() * Math.PI * 2, d = radius * (0.35 + Math.random() * 0.65);
@@ -117,9 +108,6 @@ export class NavGrid {
     return null;
   }
 
-  // A* 経路探索。戻り値: [{x,y,z,jump}] or null
-  // maxIter: 学校の牢屋→4Fのような長い立体経路は24000では探索し切れず
-  // 「到達可能なのに迷子」になるため、実測(≈110ms)を基に余裕を持たせた値
   findPath(sx, sy, sz, tx, ty, tz, maxIter = 64000) {
     const start = this.sample(sx, sy, sz), goal = this.sample(tx, ty, tz);
     if (!start || !goal) return null;
@@ -131,7 +119,6 @@ export class NavGrid {
     const gScore = new Map([[startId, 0]]);
     const from = new Map();
     const jumpEdge = new Map();
-    // 二分ヒープ [f, id]
     const heap = [[0, startId]];
     const push = (f, n) => {
       heap.push([f, n]);
@@ -181,7 +168,6 @@ export class NavGrid {
           else if (!diag && dh < 0 && -dh <= DROP_DH) c = cost * CELL * (1.15 + -dh * 0.12);
           else continue;
           if (diag) {
-            // 角抜け防止: 両直交セルに同レベル帯があること
             const a = this.levels[ci * NZ + nj].some(v => Math.abs(v - h) <= WALK_DH);
             const b = this.levels[ni * NZ + cj].some(v => Math.abs(v - h) <= WALK_DH);
             if (!a || !b) continue;
@@ -198,7 +184,6 @@ export class NavGrid {
       }
     }
     if (!found) return null;
-    // 経路復元 → 方向が変わる点だけ残す
     const raw = [];
     let cur = goalId;
     while (cur !== undefined) {
@@ -225,7 +210,6 @@ export class NavGrid {
   }
 }
 
-// solid AABBによる視線判定: o→t の間に遮蔽があるか
 export function losBlocked(o, t, solids) {
   const dx = t[0] - o[0], dy = t[1] - o[1], dz = t[2] - o[2];
   const len = Math.hypot(dx, dy, dz);

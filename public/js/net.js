@@ -1,4 +1,3 @@
-// Socket.IO ラッパー
 export class Net {
   constructor() {
     this.socket = io({ transports: ['websocket', 'polling'] });

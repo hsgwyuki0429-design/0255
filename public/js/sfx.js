@@ -1,4 +1,3 @@
-// WebAudio による全効果音のプロシージャル生成 (音声ファイル不要)
 let ctx = null;
 let master = null;
 const MASTER_VOL = 0.42;
@@ -9,7 +8,6 @@ export function initAudio() {
   ctx = new (window.AudioContext || window.webkitAudioContext)();
   master = ctx.createGain();
   master.gain.value = muted ? 0 : MASTER_VOL;
-  // 矩形波の高次倍音がキンキン耳に刺さるのを防ぐローパス
   const lp = ctx.createBiquadFilter();
   lp.type = 'lowpass';
   lp.frequency.value = 5200;
@@ -69,7 +67,7 @@ export const SFX = {
   lose()       { [400, 350, 300, 250].forEach((f, i) => tone(f, 0.3, 'sawtooth', 0.22, f * 0.9, i * 0.15)); },
   join()       { tone(660, 0.1, 'triangle', 0.2); tone(880, 0.1, 'triangle', 0.2, null, 0.08); },
   touch()      { tone(1046, 0.1, 'triangle', 0.25); tone(1319, 0.12, 'triangle', 0.22, null, 0.06); },
-  whistle()    { // 審判の笛: ピッ・ピィーッ (音量控えめ・耳に刺さらない高さに調整)
+  whistle()    {
     tone(2350, 0.14, 'square', 0.09, 2450);
     tone(2320, 0.14, 'sine', 0.07, 2420);
     tone(2350, 0.5, 'square', 0.09, 2250, 0.22);

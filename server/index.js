@@ -1,7 +1,4 @@
 // ============================================================
-// ONI RUSH - ゲームサーバー (Express + Socket.IO)
-// 部屋管理 / 3種の鬼ごっこルール / 当たり判定 / タイマー / レート
-// Render にそのままデプロイ可能 (PORT 環境変数対応)
 // ============================================================
 import express from 'express';
 import http from 'http';
@@ -24,21 +21,18 @@ app.get('/healthz', (_, res) => res.send('ok'));
 
 const PORT = process.env.PORT || 3000;
 
-// ---------------- 定数 ----------------
 const MODES = { doro: '泥警', koori: '氷鬼', kawari: '代わり鬼' };
 const MAX_PLAYERS = 10;
-const CATCH_RANGE = 1.25;    // 鬼の捕獲判定: 体の中心同士がこの距離まで近づいたらタッチ
-const CATCH_DY = 1.4;        // 捕獲判定の高さ許容 (段差ずれ)
-const CATCH_LAG_SLACK = 1.2; // クライアント申告の捕獲に許す通信ラグぶんの距離余裕
-const NO_CATCH_WHISTLE_MS = 30000; // 誰も捕まらない時間がこれを超えると笛が鳴る
-const TOUCH_RANGE = 1.7;     // 救出/氷解除の接触距離
-const GRACE_MS = 5000;       // 開始時に鬼が動けない猶予
-const SWAP_IMMUNE_MS = 3000; // 代わり鬼: タッチバック禁止時間
+const CATCH_RANGE = 1.25;
+const CATCH_DY = 1.4;
+const CATCH_LAG_SLACK = 1.2;
+const NO_CATCH_WHISTLE_MS = 30000;
+const TOUCH_RANGE = 1.7;
+const GRACE_MS = 5000;
+const SWAP_IMMUNE_MS = 3000;
 
-// ---------------- プレイヤー ----------------
 const players = new Map(); // socket.id -> {socket, name, deviceId, rating, cpuRating, games, wins, roomId}
 
-// ---------------- CPUボット用ナビゲーション (マップごとに遅延構築) ----------------
 const navCache = new Map();
 function navOf(mapId) {
   if (!navCache.has(mapId)) {
@@ -61,7 +55,6 @@ function makeBot(i, rating) {
   };
 }
 
-// ---------------- 部屋 ----------------
 const rooms = new Map();
 let roomSeq = 1;
 
@@ -91,7 +84,7 @@ class Room {
     this.mode = MODES[opts.mode] ? opts.mode : 'doro';
     this.mapId = MAPS[opts.mapId] ? opts.mapId : 'school';
     this.oniCount = Math.max(1, Math.min(4, opts.oniCount | 0 || 1));
-    this.timeLimit = Math.max(60, Math.min(600, opts.timeLimit | 0 || 180)); // 秒
+    this.timeLimit = Math.max(60, Math.min(600, opts.timeLimit | 0 || 180));
     this.isPublic = opts.isPublic !== false;
     this.password = this.isPublic ? '' : String(opts.password || '').slice(0, 16);
     this.hostId = host.id;
@@ -114,7 +107,6 @@ class Room {
     this.members.delete(p.id);
     p.roomId = null;
     p.socket.leave(this.id);
-    // CPU部屋: 人間が全員いなくなったら即解散
     if (this.isCpu && ![...this.members.values()].some(m => !m.isBot)) {
       this.clearTimers();
       rooms.delete(this.id);
@@ -133,7 +125,6 @@ class Room {
     broadcastRooms();
   }
 
-  // ---------- ゲーム開始 ----------
   start() {
     if (this.state !== 'lobby' || this.members.size < 2) return false;
     this.state = 'countdown';
@@ -152,7 +143,6 @@ class Room {
   launch() {
     const map = MAPS[this.mapId];
     const ids = [...this.members.keys()];
-    // 鬼をランダム選出 (人数-1 を上限)。CPU戦では人間の役割希望を反映する
     const oniN = Math.min(this.oniCount, ids.length - 1);
     let shuffled = [...ids].sort(() => Math.random() - 0.5);
     if (this.forceRole === 'oni' || this.forceRole === 'run') {
@@ -166,7 +156,7 @@ class Room {
     const g = this.game = {
       startAt: Date.now(), endsAt: Date.now() + this.timeLimit * 1000,
       graceUntil: Date.now() + GRACE_MS,
-      lastCatchAt: Date.now() + GRACE_MS, // 笛タイマー: 猶予明けから計測
+      lastCatchAt: Date.now() + GRACE_MS,
       players: new Map(), lastSnap: {}, over: false
     };
     let oi = 0, ri = 0;
@@ -194,7 +184,6 @@ class Room {
         }))
       });
     }
-    // CPU戦: ボットの頭脳を起動 (20Hz)
     if (this.isCpu) {
       const { nav, solids } = navOf(this.mapId);
       this.brains = [];
@@ -205,11 +194,10 @@ class Room {
         const now = Date.now();
         if (!this.game || this.game.over) return;
         for (const b of this.brains) {
-          try { b.update(0.05, now); } catch (e) { /* ボット1体の例外でゲームを止めない */ }
+          try { b.update(0.05, now); } catch (e) { }
         }
       }, 50);
     }
-    // スナップショット配信 (15Hz) + 接触捕獲チェック とルール監視 (2Hz)
     this.snapIv = setInterval(() => {
       this.checkCatches();
       const ps = {};
@@ -226,23 +214,20 @@ class Room {
     const remain = g.endsAt - now;
     io.to(this.id).emit('timeSync', { remain: Math.max(0, remain) });
     if (remain <= 0) return this.finish('time');
-    // 一定時間 誰も捕まらないと審判の笛が鳴る (鳴るたびにタイマーは仕切り直し)
     if (now - g.lastCatchAt > NO_CATCH_WHISTLE_MS) {
       g.lastCatchAt = now;
       io.to(this.id).emit('ev', { type: 'whistle' });
     }
-    // 全捕獲チェック
     const runners = [...g.players.values()].filter(p => p.role === 'run');
     if (this.mode === 'doro' && runners.length && runners.every(p => p.jailed)) return this.finish('allCaught');
     if (this.mode === 'koori' && runners.length && runners.every(p => p.frozen)) return this.finish('allCaught');
     if (runners.length === 0 || [...g.players.values()].every(p => p.role === 'run')) return this.finish('empty');
   }
 
-  // ---------- プレイヤー入力 ----------
   onState(p, data) {
     const g = this.game; if (!g) return;
     const gp = g.players.get(p.id); if (!gp) return;
-    if (gp.jailed || gp.frozen) { gp.anim = data.s | 0; return; } // 拘束中は位置更新無視
+    if (gp.jailed || gp.frozen) { gp.anim = data.s | 0; return; }
     if (Array.isArray(data.p) && data.p.length === 3 && data.p.every(Number.isFinite)) {
       const b = MAPS[this.mapId].bounds;
       gp.pos = [
@@ -255,7 +240,6 @@ class Room {
     gp.anim = data.s | 0;
   }
 
-  // 鬼と逃げの体が触れたら捕獲 (銃は廃止 → シンプルな鬼ごっこのタッチ)
   checkCatches() {
     const g = this.game; if (!g || g.over) return;
     const now = Date.now();
@@ -269,7 +253,7 @@ class Room {
         const dy = Math.abs(tp.pos[1] - oni.pos[1]);
         if (dx * dx + dz * dz < CATCH_RANGE * CATCH_RANGE && dy < CATCH_DY) {
           this.onHit(oni, tp);
-          return; // 役割が変わる可能性があるので1回のtickで1捕獲まで
+          return;
         }
       }
     }
@@ -278,7 +262,7 @@ class Room {
   onHit(oni, target) {
     const g = this.game;
     const now = Date.now();
-    g.lastCatchAt = now; // 笛タイマーをリセット
+    g.lastCatchAt = now;
     oni.stats.tags++;
     target.stats.caughtCount++;
     const targetName = this.members.get(target.id)?.name;
@@ -292,7 +276,6 @@ class Room {
       target.frozen = true;
       io.to(this.id).emit('ev', { type: 'frozen', id: target.id, by: oni.id, name: targetName, byName: oniName, pos: target.pos });
     } else if (this.mode === 'kawari') {
-      // 役割交代: 鬼の累計時間を記録
       oni.stats.oniTime += now - oni.stats.lastBecameOni;
       target.stats.lastBecameOni = now;
       oni.role = 'run'; target.role = 'oni';
@@ -306,8 +289,6 @@ class Room {
     const gp = g.players.get(p.id), tp = g.players.get(targetId);
     if (!gp || !tp) return;
     if (gp.jailed || gp.frozen) return;
-    // ---- 鬼のタッチ捕獲 (クライアント申告): 画面上で触れた瞬間に申告が来る。
-    //      通信ラグでサーバー上の位置はずれるため、余裕を持たせた距離で検証する ----
     if (gp.role === 'oni') {
       const now = Date.now();
       if (now < g.graceUntil) return;
@@ -319,7 +300,7 @@ class Room {
     }
     if (gp.role !== 'run') return;
     const dist = Math.hypot(gp.pos[0] - tp.pos[0], gp.pos[1] - tp.pos[1], gp.pos[2] - tp.pos[2]);
-    if (dist > TOUCH_RANGE + 1.0) return; // 多少の遅延を許容
+    if (dist > TOUCH_RANGE + 1.0) return;
     if (this.mode === 'doro' && tp.jailed) {
       tp.jailed = false;
       gp.stats.rescues++;
@@ -336,7 +317,6 @@ class Room {
     const gp = g.players.get(p.id);
     if (!gp) return;
     g.players.delete(p.id);
-    // 代わり鬼で鬼が抜けたらランダムな逃げに交代
     if (this.mode === 'kawari' && gp.role === 'oni') {
       const rest = [...g.players.values()].filter(x => x.role === 'run');
       if (rest.length) {
@@ -349,7 +329,6 @@ class Room {
     if (g.players.size < 2 || onis.length === 0) this.finish('abandon');
   }
 
-  // ---------- 終了とレート ----------
   async finish(reason) {
     if (this.isCpu) return this.finishCpu(reason);
     const g = this.game; if (!g || g.over) return;
@@ -360,11 +339,10 @@ class Room {
     let winner;
     if (this.mode === 'kawari') {
       for (const p of g.players.values()) if (p.role === 'oni') p.stats.oniTime += now - p.stats.lastBecameOni;
-      winner = 'run'; // 時間切れ時、鬼でない者の勝ち
+      winner = 'run';
     } else {
       winner = (reason === 'allCaught') ? 'oni' : 'run';
     }
-    // スコア算出
     const entries = [];
     for (const [id, p] of g.players) {
       const m = this.members.get(id); if (!m) continue;
@@ -403,7 +381,6 @@ class Room {
     this.addTimer(() => { io.to(this.id).emit('roomUpdate', lobbyState(this)); broadcastRooms(); }, 100);
   }
 
-  // ---------- CPU戦の終了: 人間のCPU専用レートだけを増減させる ----------
   async finishCpu(reason) {
     const g = this.game; if (!g || g.over) return;
     g.over = true;
@@ -443,7 +420,6 @@ class Room {
     for (const m of cpuSaves) saveCpuResult(m.deviceId, m.name, m.cpuRating).catch(() => {});
     this.game = null;
     this.state = 'ended';
-    // 少し待ってから解散 (クライアントは結果画面からホームへ戻る)
     this.addTimer(() => {
       for (const m of [...this.members.values()]) {
         if (!m.isBot) { m.roomId = null; m.socket.leave(this.id); }
@@ -455,7 +431,6 @@ class Room {
   }
 }
 
-// ---------------- ソケット ----------------
 io.on('connection', (socket) => {
   let me = null;
 
@@ -482,7 +457,6 @@ io.on('connection', (socket) => {
     cb?.({ ok: true, room: lobbyState(r) });
   });
 
-  // ---- CPU戦: 部屋作成→ボット追加→即開始 (ロビーなし) ----
   socket.on('startCpu', (opts, cb) => {
     if (!me) return cb?.({ ok: false, error: '未接続' });
     if (me.roomId) return cb?.({ ok: false, error: 'すでに部屋にいます' });
