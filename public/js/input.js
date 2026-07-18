@@ -14,7 +14,28 @@ export class Input {
     this.lastLookT = 0;
     this.sprintTouch = false;
     this.enabled = false;
+    // ジャイロ (端末の傾きで視点移動)
+    this.gyro = false;
+    this.gyroSens = 1;
+    this._gyroLast = null;
   }
+
+  // iOS 13+ は明示的な許可リクエスト (ユーザー操作起点) が必要
+  async enableGyro() {
+    const DOE = window.DeviceOrientationEvent;
+    if (DOE && typeof DOE.requestPermission === 'function') {
+      try {
+        const res = await DOE.requestPermission();
+        if (res !== 'granted') return false;
+      } catch { return false; }
+    } else if (!DOE) {
+      return false; // 非対応端末
+    }
+    this._gyroLast = null;
+    this.gyro = true;
+    return true;
+  }
+  disableGyro() { this.gyro = false; this._gyroLast = null; }
 
   attach() {
     const stickZone = document.getElementById('stick-zone');
@@ -120,6 +141,25 @@ export class Input {
       lastM = { x: e.clientX, y: e.clientY };
     });
     window.addEventListener('mouseup', () => { mouseDown = false; });
+
+    // ジャイロ: 端末の向きの変化量(相対デルタ)を視点入力に加算する。
+    // alpha(鉛直軸まわり)→ヨー / beta(前後傾き)→ピッチ。縦持ち前提。
+    window.addEventListener('deviceorientation', e => {
+      if (!this.gyro || !this.enabled || e.alpha == null) return;
+      const cur = { a: e.alpha, b: e.beta };
+      if (this._gyroLast) {
+        let da = cur.a - this._gyroLast.a;
+        if (da > 180) da -= 360; else if (da < -180) da += 360;
+        let db = cur.b - this._gyroLast.b;
+        if (db > 180) db -= 360; else if (db < -180) db += 360;
+        // 1度あたりの視点移動量(タッチのlookピクセル換算)。ほぼ等倍を基準に感度で調整
+        const K = 4.2 * this.gyroSens;
+        this.lookDX += -da * K;   // 端末を右へ回す→視点右
+        this.lookDY += db * K;    // 端末を前へ倒す→視点下
+        if (Math.abs(da) + Math.abs(db) > 0.15) this.lastLookT = performance.now();
+      }
+      this._gyroLast = cur;
+    });
   }
 
   getMove() {
