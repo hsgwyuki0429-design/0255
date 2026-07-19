@@ -74,6 +74,12 @@ function carveRock(boxes, rects, baseY, height, N, off, cA, cB) {
 }
 
 // ============================================================
+// Modeled on Carlsbad Caverns (Carlsbad Caverns National Park, NM):
+// a cross-shaped "Big Room" (NPS trail signage literally calls the
+// intersection "Top of the Cross") reached via a switchback "Natural
+// Entrance" descent, with named-formation-inspired chambers along the
+// loop: Giant Dome, Bottomless Pit, Rock of Ages, Painted Grotto,
+// Left/Right Fork and a Reflection Pool.
 // ============================================================
 function buildCave() {
   const boxes = [];
@@ -81,151 +87,108 @@ function buildCave() {
 
   boxes.push(B(0, -0.5, 0, 92, 0.5, 92, 0x40352b, 'dirt'));
 
-  const H = [-11, 11, -11, 11];
+  // Level 0 (y=0): the Big Room — a cross with a chamber at each arm tip
+  // (Giant Dome / N, Painted Grotto / S, Bottomless Pit / E, Left-Right
+  // Fork / W) around the central "Top of the Cross" / Rock of Ages hall,
+  // plus two offset loop passages so the trail can loop instead of
+  // dead-ending (mirrors the real Big Room's forked loop trail).
+  const TOP = [-10, 10, -10, 10];
   const L0 = [
-    H,
-    [-3, 2, -27, -11],
-    [-16, 13, -39, -27],
-    [11, 27, -3, 3],
-    [27, 40, -9, 9],
-    [-2, 4, 11, 25],
-    [-7, 19, 25, 39],
-    [-27, -11, -4, 2],
-    [-40, -27, -11, 7],
-    [-35, -30, -30, -8],
-    [-30, -16, -33, -28],
-    [12, 18, -27, -19],
-    [14, 30, -19, -14],
-    [26, 33, -14, -9],
-    [27, 33, 9, 21],
-    [15, 33, 21, 26],
-    [-31, -25, 7, 21],
-    [-25, -9, 15, 21],
-    [-11, -7, 21, 31],
-    [4, 9, -19, -11],
-    [4, 16, -19, -15],
-    [-9, -4, 11, 19],
-    [-20, -11, 28, 31],
-    [-14, -10, -44, -39],
-    [40, 44, -2, 2],
-    [2, 6, 39, 44],
-    [-44, -40, -2, 2],
+    TOP,
+    [-5, 5, -30, -10], [-14, 14, -42, -30],   // north arm + Giant Dome
+    [-5, 5, 10, 30], [-14, 15, 30, 42],       // south arm + Painted Grotto
+    [10, 30, -5, 5], [30, 42, -13, 13],       // east arm + Bottomless Pit
+    [-30, -10, -5, 5], [-42, -30, -13, 13],   // west arm + Left/Right Fork
+    [-30, -10, -18, -6],                      // west loop (Left Fork), also feeds the entrance climb
+    [10, 30, 6, 13],                          // east loop (Right Fork)
   ];
 
-  const r1 = [[-14, 14, -14, -11], [-14, 14, 11, 14], [-14, -11, -11, 11], [11, 14, -11, 11]];
-  const L1 = [
-    [-44, 44, -44, -40],
-    [-44, 44, 40, 44],
-    [40, 44, -40, 40],
-    [-44, -40, -40, 40],
-    H, ...r1,
-    [-14, -10, -44, -33],
-    [30, 44, -2, 2],
-    [2, 6, 33, 44],
-    [-44, -30, -2, 2],
-    [20, 24, -40, -24],
-    [20, 34, -28, -24],
-    [33, 37, -24, -6],
-    [-34, -28, 19, 40],
-    [-26, -22, -40, -31],
-    [24, 28, 24, 40],
-    [-16.2, -14, -14, -11],
-    [14, 16.2, 11, 14],
-  ];
+  // Level 1 (y=5): a single overlook landing that carries the Left Fork
+  // loop up into the switchback passage climbing toward the surface —
+  // real caves have one Natural Entrance, not a ring of them.
+  const DOME = [-4, 4, -4, 4];
+  const SWITCH = [-30, -10, -34, -6];
+  const L1 = [DOME, SWITCH];
 
-  const L2 = [
-    H, ...r1,
-    [-18, 18, -18, -14],
-    [-18, 18, 14, 18],
-    [-18, -14, -14, 14],
-    [14, 18, -14, 14],
-    [-2, 2, -44, -18],
-    [-2, 2, 18, 44],
-    [-30, -18, -2, 2],
-    [18, 30, -2, 2],
-    [30, 44, -2, 2],
-    [-44, -30, -2, 2],
-  ];
+  // Level 2 (y=10): the Natural Entrance — a small chamber at the top of
+  // the switchback, tucked in one corner like a real cave mouth rather
+  // than a second full floor. Extends up to cover the switchback climb
+  // itself so the low overlook-gallery ceiling doesn't clip the stairs.
+  const L2 = [[-26, -14, -44, -23]];
 
-  carveRock(boxes, L0, 0, LH, N, OFF, 0x483a2e, 0x544435);
+  carveRock(boxes, L0, 0, LH, N, OFF, 0x4a3c2c, 0x5b4a35);
   carveRock(boxes, L1, LH, LH, N, OFF, 0x554637, 0x61503e);
   carveRock(boxes, L2, LH * 2, LH, N, OFF, 0x625340, 0x6f5f49);
 
   const RS = 0x5c4c3a;
   const SH = 5 / 16, SD = 0.6;
-  boxes.push(...stairs(-12, 0, -34.5, 'n', 3.4, 16, SH, SD, RS));
-  boxes.push(...stairs(34.5, 0, 0, 'e', 3.4, 16, SH, SD, RS));
-  boxes.push(...stairs(4, 0, 34.5, 's', 3.4, 16, SH, SD, RS));
-  boxes.push(...stairs(-34.5, 0, 0, 'w', 3.4, 16, SH, SD, RS));
-  boxes.push(...stairs(-9.7, 0, 4.6, 'n', 2.6, 16, SH, SD, RS));
-  boxes.push(...stairs(9.7, 0, -4.6, 's', 2.6, 16, SH, SD, RS));
-  boxes.push(...stairs(-6.4, LH, -12.5, 'w', 2.6, 16, SH, SD, RS));
-  boxes.push(...stairs(6.4, LH, 12.5, 'e', 2.6, 16, SH, SD, RS));
+  // Big Room (Left Fork loop) -> overlook landing
+  boxes.push(...stairs(-20, 0, -8, 'n', 3.2, 16, SH, SD, RS));
+  // overlook landing -> Natural Entrance switchback climb
+  boxes.push(...stairs(-20, LH, -24, 'n', 3.2, 16, SH, SD, RS));
 
-  boxes.push(B(-29.5, 0, 19.8, 2.6, 2, 2.2, RS));
-  boxes.push(B(-24, 0, -31.8, 2.6, 2, 2.2, RS));
-  boxes.push(B(35, 0, -7, 2.6, 2, 2.4, RS));
-  boxes.push(B(26, 0, 24.8, 2.6, 2, 2.4, RS));
-  boxes.push(B(0, LH, -42, 2.6, 2.5, 2, RS));
-  boxes.push(B(0, LH, 42, 2.6, 2.5, 2, RS));
+  boxes.push(B(-24, 0, 19.8, 2.6, 2, 2.2, RS));
+  boxes.push(B(-20, LH * 2, -42, 2.6, 2.5, 2, RS, 'stone', { deco: 1 }));
 
-  boxes.push(B(-6, 0, -6, 2.2, 10, 2.2, 0x554435));
-  boxes.push(B(6, 0, 6, 2.0, 10, 2.0, 0x554435));
-  boxes.push(B(0, 0, 6.5, 2.6, 1.0, 2.6, 0x5c4c3a), B(0, 1.0, 6.5, 1.6, 0.9, 1.6, 0x554435));
-  boxes.push(B(9, 0, -9, 2, 2.2, 2, 0x5c4c3a));
-  boxes.push(B(9, 2.2, -9, 1.8, 0.5, 1.8, 0x66ddff, 'crystal', { bounce: 1, glow: 1 }));
-  boxes.push(B(-6, 0, -33, 1.9, 0.5, 1.9, 0x8f7bff, 'crystal', { bounce: 1, glow: 1 }));
-  boxes.push(B(-36, 0, 3, 1.9, 0.5, 1.9, 0x66ddff, 'crystal', { bounce: 1, glow: 1 }));
-  boxes.push(B(0, 0, 36, 1.9, 0.5, 1.9, 0x8f7bff, 'crystal', { bounce: 1, glow: 1 }));
+  // Rock of Ages — the Big Room's giant centerpiece stalagmite, floor to
+  // the overlook-gallery ceiling like the shaft the real formation rises through.
+  boxes.push(B(0, 0, 0, 3.2, 9.8, 3.2, 0x554435, 'stone', { deco: 1 }));
+  boxes.push(B(0.9, 0, -0.7, 0.9, 5.4, 0.9, 0x51443a, 'stone', { deco: 1 }));
+  boxes.push(B(0, 9.8, 0, 1.8, 0.3, 1.8, 0x66ddff, 'crystal', { bounce: 1, glow: 1 }));
 
-  boxes.push(B(34, 0, 2, 9, 0.25, 10, 0x2b6f8f, 'water', { deco: 1, glow: 1 }));
-  boxes.push(B(-34, 0, -3, 6, 0.2, 5, 0x2b6f8f, 'water', { deco: 1 }));
-  boxes.push(B(-30.5, 0, 0, 3, 0.2, 3, 0x2b6f8f, 'water', { deco: 1 }));
+  // Giant Dome — a wide dome-topped column anchoring the north chamber.
+  boxes.push(B(0, 0, -36, 3.6, 4.6, 3.6, 0x554435, 'stone', { deco: 1 }));
+  boxes.push(B(0, 4.6, -36, 4.4, 1.0, 4.4, 0x5b4a35, 'stone', { deco: 1 }));
+  boxes.push(B(1.3, 0, -34, 1.0, 2.4, 1.0, 0x51443a, 'stone', { deco: 1 }));
+  boxes.push(B(0, 4.9, -36, 1.6, 0.4, 1.6, 0xffcf8a, 'crystal', { bounce: 1, glow: 1 }));
 
-  for (let i = 0; i < 5; i++) boxes.push(B(8.7 + i * 1.5, 0, 30.4, 0.22, 3.0, 0.22, 0xe8e0d2, 'bone', { deco: 1 }));
+  // Bottomless Pit — a railed-off overlook into a dark shaft in the east chamber.
+  boxes.push(...wallX(34.5, 39.5, -3, 0, 1.0, 0.18, [], 0xc8ccd4, 'rail'));
+  boxes.push(...wallX(34.5, 39.5, 3, 0, 1.0, 0.18, [], 0xc8ccd4, 'rail'));
+  boxes.push(...wallZ(-3, 3, 34.5, 0, 1.0, 0.18, [], 0xc8ccd4, 'rail'));
+  boxes.push(...wallZ(-3, 3, 39.5, 0, 1.0, 0.18, [], 0xc8ccd4, 'rail'));
+  boxes.push(B(37, -0.35, 0, 4.6, 0.05, 4.6, 0x0c0a08, 'dirt', { deco: 1 }));
+  boxes.push(B(37, -4, 0, 0.3, 0.3, 0.3, 0x8899ff, 'crystal', { deco: 1, glow: 1 }));
+
+  // Painted Grotto — warm iron-oxide-stained flowstone cluster in the south chamber.
+  const grotto = [[8, 34], [11, 37], [14, 33], [17, 38], [10, 40]];
+  for (const [gx, gz] of grotto) {
+    boxes.push(B(gx, 0, gz, 0.7, 1.6 + ((gx + gz) % 5) / 4, 0.7, 0x8a5a34, 'stone', { deco: 1 }));
+    boxes.push(B(gx + 0.4, 0.2, gz - 0.3, 0.32, 0.6, 0.32, 0xffa030, 'crystal', { deco: 1, glow: 1 }));
+  }
   boxes.push(B(11.5, 3.0, 33.5, 7, 0.3, 7, 0xd8cfc0, 'bone', { deco: 1 }));
-  boxes.push(B(4, 0, 36, 2.6, 0.8, 1.2, 0xd8cfc0, 'bone', { deco: 1 }));
-  boxes.push(B(16, 0, 27, 1.4, 1.0, 1.4, 0xe8e0d2, 'bone', { deco: 1 }));
 
-  const stal = [[-13, -35], [8, -31], [-33, -25], [30, -16], [-15, 17], [22, 23], [-36, 5], [36, 6], [12, 34], [-4, 28]];
+  // Reflection Pool — a still pool near the crossing, per the real trail's namesake stop.
+  boxes.push(B(-6, 0, 5.5, 5, 0.22, 3.6, 0x2b6f8f, 'water', { deco: 1, glow: 1 }));
+  boxes.push(B(34, 0, -34, 5, 0.18, 4, 0x2b6f8f, 'water', { deco: 1 }));
+
+  const stal = [[-20, -20], [4, -20], [-4, -22], [22, -3], [-22, 3], [-6, 20], [6, 22], [-36, -8], [36, 8], [-36, 34], [8, -34], [-8, -34]];
   for (const [sx, sz] of stal) {
-    boxes.push(B(sx, 0, sz, 0.8, 2.2 + ((sx * 7 + sz * 13) % 10) / 8, 0.8, 0x51443a, 'stone', { deco: 1 }));
-    boxes.push(B(sx + 0.6, 0, sz - 0.4, 0.45, 1.1, 0.45, 0x51443a, 'stone', { deco: 1 }));
+    boxes.push(B(sx, 0, sz, 0.8, 1.8 + ((sx * 7 + sz * 13) % 10) / 8, 0.8, 0x51443a, 'stone', { deco: 1 }));
+    boxes.push(B(sx + 0.6, 0, sz - 0.4, 0.45, 1.0, 0.45, 0x51443a, 'stone', { deco: 1 }));
   }
 
-  const stalac = [[0, -18], [-1, -24], [13, -1], [19, 1], [24, -17], [-13, 0], [-19, -2], [1, 14], [-1, 20], [-22, -30], [29, 14], [-27, 12], [-9, 29], [20, 23], [30, -12]];
+  const stalac = [[3, -18], [-3, -15], [18, 2], [-18, -2], [3, 18], [-3, 15], [-2, -38], [2, -38], [-4, 24], [24, -8], [-24, 8], [17, -36], [-17, 36]];
   for (const [sx, sz] of stalac) {
     const h = 0.9 + (((sx * 5 + sz * 11) % 8) + 8) % 8 / 10;
     boxes.push(B(sx, LH - h, sz, 0.5, h, 0.5, 0x4a3d30, 'stone', { deco: 1 }));
     boxes.push(B(sx + 0.45, LH - 0.6, sz + 0.3, 0.28, 0.6, 0.28, 0x4a3d30, 'stone', { deco: 1 }));
   }
 
-  const moss = [[-8, -8], [7, -4], [-10, -34], [10, -30], [30, 7], [-38, 5], [0, 27], [14, 36], [16, -24], [-28, 17]];
+  const moss = [[0, -20], [0, 20], [20, 0], [-20, 0], [-24, -35], [-36, 6], [12, 35], [-12, -8], [8, 8]];
   for (const [mx, mz] of moss) {
     boxes.push(B(mx, 0, mz, 1.6 + (((mx + mz) % 3) + 3) % 3 * 0.5, 0.05, 1.3, 0x3f6a4a, 'leaf', { deco: 1 }));
     boxes.push(B(mx + 1.1, 0, mz - 0.8, 0.8, 0.04, 0.7, 0x4a7a55, 'leaf', { deco: 1 }));
   }
 
-  boxes.push(B(-3, 0, 33, 1.0, 0.22, 0.28, 0x5a4028, 'wood', { deco: 1 }));
-  boxes.push(B(-3, 0, 33, 0.28, 0.22, 1.0, 0x5a4028, 'wood', { deco: 1 }));
-  boxes.push(B(-3, 0.18, 33, 0.42, 0.55, 0.42, 0xffa030, 'crystal', { deco: 1, glow: 1 }));
-  boxes.push(B(-3, 0.6, 33, 0.2, 0.35, 0.2, 0xffd980, 'crystal', { deco: 1, glow: 1 }));
-
-  boxes.push(B(2, 0, 30, 1.8, 0.3, 0.5, 0xd8cfc0, 'bone', { deco: 1 }));
-  boxes.push(B(6.5, 0, 36.5, 0.9, 0.65, 0.9, 0xe8e0d2, 'bone', { deco: 1 }));
-  boxes.push(B(17, 0, 33, 2.2, 0.35, 0.7, 0xd8cfc0, 'bone', { deco: 1 }));
-  boxes.push(B(-5.5, 0, 28, 0.5, 0.9, 0.5, 0xe8e0d2, 'bone', { deco: 1 }));
-
-  for (const [wx, wz] of [[31, -1], [36, 4], [33, 6], [-34, -2]]) {
-    boxes.push(B(wx, 0.15, wz, 0.28, 0.7, 0.28, 0x55e8c0, 'crystal', { deco: 1, glow: 1 }));
-    boxes.push(B(wx + 0.4, 0.15, wz - 0.3, 0.2, 0.45, 0.2, 0x55e8c0, 'crystal', { deco: 1, glow: 1 }));
-  }
+  // Left / Right Fork — a rock pillar marking the loop passages.
+  boxes.push(B(-26, 0, -15, 1.6, 2.6, 1.6, 0x51443a, 'stone', { deco: 1 }));
+  boxes.push(B(20, 0, 9.5, 1.6, 2.6, 1.6, 0x51443a, 'stone', { deco: 1 }));
 
   const crys = [
-    [0, 0, -9.5, 0x66ffee], [-9, 0, 3, 0xbb88ff], [16, 0, 0, 0x88aaff], [-16, 0, 0, 0x66ffee],
-    [-34, 0, -33, 0xbb88ff], [-6, 0, -36, 0x88ffcc], [37, 0, -6, 0x66ffee], [-36, 0, -8, 0xbb88ff],
-    [-4, 0, 36, 0x88ffcc], [16, 0, 36, 0xffaa66],
-    [-16, 10, -16, 0x66ffee], [16, 10, 16, 0xbb88ff], [12, 5, -12.8, 0x88aaff], [-12, 5, 12.8, 0x88ffcc]
+    [-20, 0, -20, 0x66ffee], [20, 0, 20, 0xbb88ff], [-20, 0, 20, 0x88aaff], [20, 0, -20, 0x66ffee],
+    [-36, 0, -35, 0xbb88ff], [36, 0, 35, 0x88ffcc], [-36, 0, 33, 0x66ffee], [36, 0, -33, 0xbb88ff],
+    [0, 5, -30, 0x66ffee], [0, 5, 30, 0xbb88ff], [-22, LH, -37, 0x88aaff],
   ];
   for (const [cx, cy, cz, cc] of crys) {
     boxes.push(B(cx, cy, cz, 0.7, 1.6, 0.7, cc, 'crystal', { deco: 1, glow: 1 }));
@@ -233,21 +196,21 @@ function buildCave() {
   }
   return {
     id: 'cave', name: '地下洞窟', boxes,
-    sky: 0x07070c, fog: { color: 0x0a0a12, near: 10, far: 58 },
-    ambient: 0.5, sun: 0.35, sunColor: 0x8899cc,
+    sky: 0x0a0705, fog: { color: 0x120e08, near: 10, far: 58 },
+    ambient: 0.52, sun: 0.4, sunColor: 0xffcc88,
     lights: [
-      { x: 0, y: 4, z: -9.5, c: 0x66ffee, i: 30, d: 24 }, { x: 16, y: 2, z: 0, c: 0x88aaff, i: 24, d: 20 },
-      { x: -16, y: 2, z: 0, c: 0x66ffee, i: 24, d: 20 }, { x: -34, y: 2, z: -33, c: 0xbb88ff, i: 26, d: 22 },
-      { x: 37, y: 2, z: -6, c: 0x66ffee, i: 24, d: 20 }, { x: -4, y: 2, z: 36, c: 0x88ffcc, i: 26, d: 22 },
-      { x: -16, y: 12, z: -16, c: 0x66ffee, i: 24, d: 22 }, { x: 16, y: 12, z: 16, c: 0xbb88ff, i: 24, d: 22 }
+      { x: 0, y: 4, z: 0, c: 0xffcc88, i: 32, d: 26 }, { x: 0, y: 2, z: -36, c: 0xffcc88, i: 26, d: 22 },
+      { x: 37, y: 2, z: 0, c: 0x8899ff, i: 22, d: 20 }, { x: 12, y: 2, z: 35, c: 0xff9a55, i: 26, d: 22 },
+      { x: -36, y: 2, z: -35, c: 0x66ffee, i: 22, d: 20 }, { x: -6, y: 2, z: 5.5, c: 0x88ccff, i: 20, d: 18 },
+      { x: -19, y: 12, z: -37, c: 0xffe0b0, i: 22, d: 22 }, { x: 0, y: 8, z: -12, c: 0xffcc88, i: 20, d: 22 }
     ],
     bounds: { minX: -44, maxX: 44, minZ: -44, maxZ: 44 },
     jail: { x: 11.5, y: 0, z: 33.5, w: 6, d: 6 },
     spawns: {
-      oni: [[0, 0.1, 0], [2.5, 0.1, 2.5], [-2.5, 0.1, -2.5], [2.5, 0.1, -2.5], [-2.5, 0.1, 2.5], [0, 0.1, 4], [4, 0.1, 0], [-4, 0.1, 0]],
+      oni: [[3, 0.1, 3], [-3, 0.1, -3], [3, 0.1, -3], [-3, 0.1, 3], [0, 0.1, 4], [4, 0.1, 0], [-4, 0.1, 0], [0, 0.1, -4]],
       run: [
-        [-6, 0.1, -30], [6, 0.1, -33], [34, 0.1, 6], [-34, 0.1, -6], [0, 0.1, 32], [20, 0.1, -16],
-        [-16, 0.1, 18], [-30, 5.1, -42], [30, 5.1, 42], [16, 10.1, 0], [-32, 0.1, -18], [30, 0.1, 15]
+        [0, 0.1, -36], [-36, 0.1, 0], [36, 0.1, 0], [0, 0.1, 38], [-26, 0.1, -15], [20, 0.1, 9.5],
+        [3, 0.1, -20], [-3, 0.1, 20], [16, 0.1, -3], [-16, 0.1, 3], [-20, 5.1, -30], [-20, 10.1, -38]
       ]
     }
   };
@@ -575,6 +538,9 @@ function buildSchool() {
       boxes.push(B(10.5, Y + 3.0, -28, 6, 0.8, 0.3, 0x2a9d5c, 'sign', { deco: 1, glow: 1 }));
       boxes.push(B(-16.5, Y, -33, 5, 0.78, 2.4, 0xc9a878, 'wood'));
       boxes.push(B(-6, Y, -35, 2.2, 0.6, 4, 0xe8e8f0, 'tile'));
+      // MEXT-standard entrance layout: a directory board (staff room / nurse's
+      // office are the rooms conventionally flanking the genkan) above the door.
+      boxes.push(B(0, Y + 1.4, -24.3, 3.4, 1.0, 0.15, 0x3a6fd8, 'sign', { deco: 1, glow: 1 }));
     } else if (fl < 3) {
       for (const [x1, x2] of roomsX) {
         const cx = (x1 + x2) / 2;
