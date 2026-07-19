@@ -1,6 +1,6 @@
 {
   "name": "oni-rush",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "description": "3D online tag game (doro-kei / koori-oni / kawari-oni) with Three.js + Socket.IO + Supabase",
   "type": "module",
   "main": "server/index.js",
