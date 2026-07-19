@@ -61,11 +61,21 @@ export class Input {
       for (const t of e.changedTouches) {
         if (t.identifier !== this.stickId) continue;
         const dx = t.clientX - this.stickOrigin.x, dy = t.clientY - this.stickOrigin.y;
-        const len = Math.hypot(dx, dy), max = 52;
-        const k = len > max ? max / len : 1;
-        this.move.x = (dx * k) / max;
-        this.move.y = (dy * k) / max;
-        knob.style.transform = `translate(calc(-50% + ${dx * k}px), calc(-50% + ${dy * k}px))`;
+        // 縦長カプセル型スティック: 横26px / 縦52px の楕円にクランプ
+        const RX = 26, RY = 52;
+        let nx = dx / RX, ny = dy / RY;
+        const l = Math.hypot(nx, ny);
+        if (l > 1) { nx /= l; ny /= l; }
+        // 前進バイアス: 前方±120°の入力を±42°へ圧縮し、真横に倒してもほぼ前進にする。
+        // 残りの後方60°は後退(180°)まで連続に引き伸ばす
+        const mag = Math.min(1, Math.hypot(nx, ny));
+        let a = Math.atan2(nx, -ny);
+        const FZ = 2.1, K = 0.35;
+        if (Math.abs(a) <= FZ) a *= K;
+        else a = Math.sign(a) * (FZ * K + (Math.abs(a) - FZ) * (Math.PI - FZ * K) / (Math.PI - FZ));
+        this.move.x = Math.sin(a) * mag;
+        this.move.y = -Math.cos(a) * mag;
+        knob.style.transform = `translate(calc(-50% + ${nx * RX}px), calc(-50% + ${ny * RY}px))`;
       }
     }, { passive: false });
     const stickEnd = e => {
@@ -147,6 +157,9 @@ export class Input {
     window.addEventListener('deviceorientation', e => {
       if (!this.gyro || !this.enabled || e.alpha == null) return;
       const cur = { a: e.alpha, b: e.beta };
+      // 右半画面を押している間だけ視点に反映する。離している間も基準値は
+      // 更新し続け、押し直した瞬間に視点が飛ばないようにする
+      if (this.lookId === null) { this._gyroLast = cur; return; }
       if (this._gyroLast) {
         let da = cur.a - this._gyroLast.a;
         if (da > 180) da -= 360; else if (da < -180) da += 360;

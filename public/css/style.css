@@ -251,9 +251,10 @@ input[type="range"]::-moz-range-thumb { width: 26px; height: 26px; border: none;
 
 #stick-zone { position: absolute; left: 0; top: 0; width: 50%; height: 100%; touch-action: none; }
 #right-zone { position: absolute; right: 0; top: 0; width: 50%; height: 100%; touch-action: none; }
-#stick-base { position: absolute; width: 120px; height: 120px; border-radius: 50%;
+/* 縦長カプセル: 縦(前進/後退)が主軸で、横は補助的な操作であることを形で伝える */
+#stick-base { position: absolute; width: 92px; height: 144px; border-radius: 980px;
   background: rgba(255, 255, 255, .12); transform: translate(-50%, -50%); }
-#stick-knob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; border-radius: 50%;
+#stick-knob { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; border-radius: 50%;
   background: rgba(255, 255, 255, .55); transform: translate(-50%, -50%); }
 #btn-view { position: absolute; right: max(10px, env(safe-area-inset-right)); top: max(10px, env(safe-area-inset-top));
   background: rgba(0, 0, 0, .55); border: none; color: #fff; font-size: 13px; font-weight: 600;
