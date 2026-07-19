@@ -10,6 +10,22 @@ import { Minimap } from './minimap.js';
 import { VFX } from './vfx.js';
 import { initAudio, SFX, isMuted, setMuted } from './sfx.js';
 
+// LINEのアプリ内ブラウザで開かれた場合、Safari等の外部ブラウザで開き直す
+(function openInExternalBrowserIfLine() {
+  const ua = navigator.userAgent || '';
+  if (!/\bLine\//i.test(ua)) return;
+  if (/[?&]openExternalBrowser=1\b/.test(location.search)) return;
+  const sep = location.search ? '&' : '?';
+  location.replace(location.href + sep + 'openExternalBrowser=1');
+})();
+
+function requestFullscreenOnce() {
+  if (document.fullscreenElement || document.webkitFullscreenElement) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  req?.call(el)?.catch?.(() => {});
+}
+
 const $ = id => document.getElementById(id);
 const net = new Net();
 const input = new Input();
@@ -90,6 +106,58 @@ net.on('connect', async () => { await connect(); refreshRooms(); });
 net.on('disconnect', () => { if (game) toast('サーバーとの接続が切れました'); });
 
 $('btn-refresh').onclick = refreshRooms;
+
+// ---- ホーム画面に追加 (PWAインストール) 誘導バナー ----
+(function setupPwaBanner() {
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (isStandalone || sessionStorage.getItem('oni-pwa-dismissed')) return;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const banner = $('pwa-banner');
+  const text = $('pwa-banner-text');
+  const installBtn = $('pwa-banner-install');
+
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    text.textContent = '📲 ホーム画面に追加すると、次からアプリのようにすぐ起動できます';
+    installBtn.classList.remove('hidden');
+    banner.classList.remove('hidden');
+  });
+
+  installBtn.onclick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    banner.classList.add('hidden');
+  };
+
+  $('pwa-banner-close').onclick = () => {
+    banner.classList.add('hidden');
+    sessionStorage.setItem('oni-pwa-dismissed', '1');
+  };
+
+  if (isIOS) {
+    text.textContent = '📲 共有ボタン(⬆︎)から「ホーム画面に追加」すると、次からアプリのようにすぐ起動できます';
+    banner.classList.remove('hidden');
+  }
+})();
+
+// ---- 最新バージョンにする ----
+$('btn-update').onclick = async () => {
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch {}
+  location.href = location.pathname + '?v=' + Date.now();
+};
 $('inp-name').addEventListener('change', connect);
 
 const cState = { mode: 'doro', mapId: 'school' };
@@ -787,6 +855,6 @@ function loop(t) {
 
 window.__game = () => game;
 
-document.body.addEventListener('touchstart', () => initAudio(), { once: true });
-document.body.addEventListener('mousedown', () => initAudio(), { once: true });
+document.body.addEventListener('touchstart', () => { initAudio(); requestFullscreenOnce(); }, { once: true });
+document.body.addEventListener('mousedown', () => { initAudio(); requestFullscreenOnce(); }, { once: true });
 show('screen-home');
