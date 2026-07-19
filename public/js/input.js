@@ -155,7 +155,7 @@ export class Input {
         // 1度あたりの視点移動量(タッチのlookピクセル換算)。ほぼ等倍を基準に感度で調整
         const K = 4.2 * this.gyroSens;
         this.lookDX += -da * K;   // 端末を右へ回す→視点右
-        this.lookDY += db * K;    // 端末を前へ倒す→視点下
+        this.lookDY += -db * K;   // 端末を前へ倒す→視点下
         if (Math.abs(da) + Math.abs(db) > 0.15) this.lastLookT = performance.now();
       }
       this._gyroLast = cur;
