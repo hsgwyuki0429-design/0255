@@ -153,13 +153,23 @@ export class Input {
     window.addEventListener('mouseup', () => { mouseDown = false; });
 
     // ジャイロ: 端末の向きの変化量(相対デルタ)を視点入力に加算する。
-    // alpha(鉛直軸まわり)→ヨー / beta(前後傾き)→ピッチ。縦持ち前提。
+    // alpha(鉛直軸まわり)→ヨー。
+    // beta/gammaは端末の物理軸に固定されているため、横持ちだと前後の傾き
+    // (ピッチ)はgamma側に出る。画面回転角で参照する軸を切り替える。
     window.addEventListener('deviceorientation', e => {
       if (!this.gyro || !this.enabled || e.alpha == null) return;
-      const cur = { a: e.alpha, b: e.beta };
+      const angle = (screen.orientation && screen.orientation.angle) ?? window.orientation ?? 0;
+      let pitchRaw;
+      if (angle === 90) pitchRaw = -e.gamma;
+      else if (angle === -90 || angle === 270) pitchRaw = e.gamma;
+      else if (angle === 180) pitchRaw = -e.beta;
+      else pitchRaw = e.beta;
+      const cur = { a: e.alpha, b: pitchRaw, angle };
       // 右半画面を押している間だけ視点に反映する。離している間も基準値は
-      // 更新し続け、押し直した瞬間に視点が飛ばないようにする
-      if (this.lookId === null) { this._gyroLast = cur; return; }
+      // 更新し続け、押し直した瞬間に視点が飛ばないようにする。
+      // 画面回転をまたいだ直後は基準軸が変わるため、飛ばずに取り直す
+      const rotated = this._gyroLast && this._gyroLast.angle !== angle;
+      if (this.lookId === null || rotated) { this._gyroLast = cur; return; }
       if (this._gyroLast) {
         let da = cur.a - this._gyroLast.a;
         if (da > 180) da -= 360; else if (da < -180) da += 360;
