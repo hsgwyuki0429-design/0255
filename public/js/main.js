@@ -10,6 +10,22 @@ import { Minimap } from './minimap.js';
 import { VFX } from './vfx.js';
 import { initAudio, SFX, isMuted, setMuted } from './sfx.js';
 
+// LINEのアプリ内ブラウザで開かれた場合、Safari等の外部ブラウザで開き直す
+(function openInExternalBrowserIfLine() {
+  const ua = navigator.userAgent || '';
+  if (!/\bLine\//i.test(ua)) return;
+  if (/[?&]openExternalBrowser=1\b/.test(location.search)) return;
+  const sep = location.search ? '&' : '?';
+  location.replace(location.href + sep + 'openExternalBrowser=1');
+})();
+
+function requestFullscreenOnce() {
+  if (document.fullscreenElement || document.webkitFullscreenElement) return;
+  const el = document.documentElement;
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  req?.call(el)?.catch?.(() => {});
+}
+
 const $ = id => document.getElementById(id);
 const net = new Net();
 const input = new Input();
@@ -787,6 +803,6 @@ function loop(t) {
 
 window.__game = () => game;
 
-document.body.addEventListener('touchstart', () => initAudio(), { once: true });
-document.body.addEventListener('mousedown', () => initAudio(), { once: true });
+document.body.addEventListener('touchstart', () => { initAudio(); requestFullscreenOnce(); }, { once: true });
+document.body.addEventListener('mousedown', () => { initAudio(); requestFullscreenOnce(); }, { once: true });
 show('screen-home');
