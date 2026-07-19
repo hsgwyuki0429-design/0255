@@ -106,6 +106,58 @@ net.on('connect', async () => { await connect(); refreshRooms(); });
 net.on('disconnect', () => { if (game) toast('サーバーとの接続が切れました'); });
 
 $('btn-refresh').onclick = refreshRooms;
+
+// ---- ホーム画面に追加 (PWAインストール) 誘導バナー ----
+(function setupPwaBanner() {
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  if (isStandalone || sessionStorage.getItem('oni-pwa-dismissed')) return;
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  const banner = $('pwa-banner');
+  const text = $('pwa-banner-text');
+  const installBtn = $('pwa-banner-install');
+
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    text.textContent = '📲 ホーム画面に追加すると、次からアプリのようにすぐ起動できます';
+    installBtn.classList.remove('hidden');
+    banner.classList.remove('hidden');
+  });
+
+  installBtn.onclick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    banner.classList.add('hidden');
+  };
+
+  $('pwa-banner-close').onclick = () => {
+    banner.classList.add('hidden');
+    sessionStorage.setItem('oni-pwa-dismissed', '1');
+  };
+
+  if (isIOS) {
+    text.textContent = '📲 共有ボタン(⬆︎)から「ホーム画面に追加」すると、次からアプリのようにすぐ起動できます';
+    banner.classList.remove('hidden');
+  }
+})();
+
+// ---- 最新バージョンにする ----
+$('btn-update').onclick = async () => {
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch {}
+  location.href = location.pathname + '?v=' + Date.now();
+};
 $('inp-name').addEventListener('change', connect);
 
 const cState = { mode: 'doro', mapId: 'school' };

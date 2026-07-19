@@ -20,6 +20,11 @@
 <body>
 <div id="screen-home" class="screen active">
   <div class="home-bg"></div>
+  <div id="pwa-banner" class="pwa-banner hidden">
+    <span id="pwa-banner-text" class="pwa-banner-text">📲 ホーム画面に追加すると、次からアプリのようにすぐ起動できます</span>
+    <button id="pwa-banner-install" class="pwa-banner-btn hidden">追加する</button>
+    <button id="pwa-banner-close" class="pwa-banner-close" aria-label="閉じる">×</button>
+  </div>
   <div class="home-inner">
     <h1 class="logo">ONI<span>RUSH</span></h1>
     <p class="tagline">3Dオンライン鬼ごっこ ─ 泥警・氷鬼・代わり鬼</p>
@@ -56,7 +61,7 @@
       <button id="btn-cpu" class="big-btn cpu">🤖 CPUと遊ぶ</button>
     </div>
   </div>
-  <div class="version-tag">バージョン2.5</div>
+  <div class="version-tag">バージョン2.6<button id="btn-update" class="version-update">最新版にする ⟳</button></div>
   <button id="btn-settings" class="home-gear" aria-label="設定">⚙︎</button>
 </div>
 

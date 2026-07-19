@@ -109,7 +109,23 @@ input::placeholder { color: var(--ink-3); }
 .cpu-strength b { color: var(--ink); font-weight: 700; }
 .version-tag { position: absolute; left: max(16px, env(safe-area-inset-left));
   bottom: max(12px, env(safe-area-inset-bottom)); font-size: 11px; color: var(--ink-3);
-  letter-spacing: .02em; pointer-events: none; }
+  letter-spacing: .02em; display: flex; align-items: center; gap: 8px; }
+.version-update { pointer-events: auto; background: var(--fill); color: var(--ink-2);
+  border: none; border-radius: 980px; padding: 4px 10px; font-size: 11px; font-weight: 600; }
+.version-update:hover { opacity: .7; }
+
+/* PWAインストール誘導バナー (ホーム画面最上部) */
+.pwa-banner { position: relative; z-index: 6; display: flex; align-items: center; gap: 10px;
+  background: var(--ink); color: var(--bg); padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+  padding-top: max(10px, env(safe-area-inset-top)); font-size: 13px; }
+.pwa-banner.hidden { display: none; }
+.pwa-banner-text { flex: 1; line-height: 1.4; }
+.pwa-banner-btn { background: var(--accent); color: #fff; border: none; border-radius: 980px;
+  padding: 8px 16px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.pwa-banner-btn.hidden { display: none; }
+.pwa-banner-close { background: transparent; color: var(--bg); border: none; font-size: 20px;
+  line-height: 1; padding: 0 4px; opacity: .7; }
+.pwa-banner-close:hover { opacity: 1; }
 .ghost { background: var(--fill); color: var(--ink); padding: 14px 28px; border-radius: 980px;
   font-size: 15px; font-weight: 500; }
 .ghost:hover { opacity: .7; }
