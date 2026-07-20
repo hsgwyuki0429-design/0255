@@ -73,6 +73,29 @@ function carveRock(boxes, rects, baseY, height, N, off, cA, cB) {
   }
 }
 
+// 重なり合う箱で立体的・有機的な樹冠を作る (すべて deco = 当たり判定なし)
+function canopy(boxes, cx, cz, baseY, rad, color, mat = 'leaf') {
+  const blobs = [
+    [0, 0, 0, 1.0], [-0.52, 0.16, -0.4, 0.7], [0.55, 0.12, 0.32, 0.72],
+    [0.32, 0.36, -0.5, 0.6], [-0.42, 0.4, 0.46, 0.58], [0, 0.62, 0.02, 0.66]
+  ];
+  for (const [ox, oy, oz, sc] of blobs) {
+    const w = rad * 2 * sc;
+    boxes.push(B(cx + ox * rad, baseY + oy * rad, cz + oz * rad, w, w * 0.74, w, color, mat, { deco: 1 }));
+  }
+}
+
+// 幹 (下部は当たり判定あり) + 立体樹冠。canopyColorB があれば2色を混ぜる
+function tree(boxes, tx, tz, trunkH, trunkW, canR, colA, colB) {
+  boxes.push(B(tx, 0, tz, trunkW, trunkH, trunkW, 0x6a4a34, 'wood'));
+  boxes.push(B(tx, trunkH, tz, trunkW * 0.82, canR * 0.5, trunkW * 0.82, 0x6a4a34, 'wood', { deco: 1 }));
+  canopy(boxes, tx, tz, trunkH - 0.2, canR, colA);
+  if (colB !== undefined) {
+    // 明るい花/葉を上面に少量重ねて立体感を出す
+    canopy(boxes, tx, tz, trunkH + canR * 0.32, canR * 0.62, colB);
+  }
+}
+
 // ============================================================
 // ============================================================
 function buildCave() {
@@ -231,9 +254,18 @@ function buildCave() {
     boxes.push(B(cx, cy, cz, 0.7, 1.6, 0.7, cc, 'crystal', { deco: 1, glow: 1 }));
     boxes.push(B(cx + 0.5, cy, cz - 0.3, 0.4, 0.9, 0.4, cc, 'crystal', { deco: 1, glow: 1 }));
   }
+
+  // 中央シャフト頂部の岩天井 — 空の黒い抜けを塞ぎ、閉じた洞窟らしくする (deco=当たり判定なし)
+  boxes.push(B(0, 15, 0, 30, 2.4, 30, 0x2a2119, 'stone', { deco: 1 }));
+  boxes.push(B(0, 14.5, 0, 23, 0.6, 23, 0x241d16, 'stone', { deco: 1 }));
+  for (const [hx, hz] of [[-6, -5], [7, 4], [-8, 6], [5, -7], [0, 0]]) {
+    boxes.push(B(hx, 13.7, hz, 1.4, 1.1, 1.4, 0x2a2119, 'stone', { deco: 1 }));
+  }
+
   return {
     id: 'cave', name: '地下洞窟', boxes,
-    sky: 0x07070c, fog: { color: 0x0a0a12, near: 10, far: 58 },
+    sky: 0x07070c, skyTop: 0x05050b, skyBottom: 0x12121e, skyExp: 1.1,
+    fog: { color: 0x0a0a12, near: 10, far: 58 },
     ambient: 0.5, sun: 0.35, sunColor: 0x8899cc,
     lights: [
       { x: 0, y: 4, z: -9.5, c: 0x66ffee, i: 30, d: 24 }, { x: 16, y: 2, z: 0, c: 0x88aaff, i: 24, d: 20 },
@@ -276,14 +308,14 @@ function buildMall() {
   boxes.push(B(-54.9, 0, -10, 1.2, 1.9, 26, 0x9fb8c8, 'goods'));
   boxes.push(B(-50, 0, 24, 4.5, 0.9, 3, 0x7aa86a, 'wood'), B(-42, 0, 24, 4.5, 0.9, 3, 0x7aa86a, 'wood'));
   boxes.push(B(-36, 0, -8, 2.6, 0.95, 1.1, 0xd0d5da, 'metal'), B(-36, 0, 8, 2.6, 0.95, 1.1, 0xd0d5da, 'metal'));
-  boxes.push(B(-45, 4.8, -34, 16, 1.4, 0.3, 0xc42a76, 'sign', { deco: 1, glow: 1 }));
+  boxes.push(B(-45, 3.3, -24.5, 16, 1.1, 0.3, 0xc42a76, 'sign', { deco: 1, glow: 1 }));
 
   boxes.push(B(2, 0, 0, 5.2, 0.65, 5.2, 0xdfe8ee, 'tile'));
   boxes.push(B(2, 0.65, 0, 3.8, 0.25, 3.8, 0x58b8e8, 'water', { deco: 1, glow: 1 }));
   boxes.push(B(2, 0.65, 0, 0.9, 2.2, 0.9, 0xdfe8ee, 'tile'));
   for (const [px, pz] of [[-5, -12], [9, -12], [-5, 12], [9, 12]]) {
     boxes.push(B(px, 0, pz, 1.8, 0.75, 1.8, 0x8a7a64, 'wood'));
-    boxes.push(B(px, 0.75, pz, 1.1, 1.5, 1.1, 0x3f9b4f, 'leaf', { deco: 1 }));
+    canopy(boxes, px, pz, 0.75, 0.72, 0x4a9b52);
   }
   for (const [bx, bz] of [[-5, -5], [9, 5], [-20, 5.8], [24, -5.8], [-30, -5.8], [34, 5.8]]) {
     boxes.push(B(bx, 0, bz, 2.6, 0.55, 0.8, 0xb08a5f, 'wood'));
@@ -300,7 +332,8 @@ function buildMall() {
       const cx = (x1 + x2) / 2;
       boxes.push(...wallX(x1, x2, front, 0, 4.6, 0.5, [[x1 + 1.5, x1 + 4], [x2 - 4, x2 - 1.5]], SHOP));
       boxes.push(...wallX(x1, x2, back, 0, 4.6, 0.4, [[cx - 0.8, cx + 0.8]], BACK));
-      if (x1 !== -34) boxes.push(...wallZ(Math.min(front, back), Math.max(front, back), x1, 0, 4.6, 0.4, [], SHOP));
+      // x1側は前セグメントのx2と共有する場合は描かない (壁の完全重複=Zファイティング防止)
+      if (x1 !== -34 && (i === 0 || shopSegs[i - 1][1] !== x1)) boxes.push(...wallZ(Math.min(front, back), Math.max(front, back), x1, 0, 4.6, 0.4, [], SHOP));
       if (x2 !== 42) boxes.push(...wallZ(Math.min(front, back), Math.max(front, back), x2, 0, 4.6, 0.4, [], SHOP));
       boxes.push(B(cx, 4.7, front, (x2 - x1) - 3, 1.1, 0.3, shopColors[(i + (s === 1 ? 3 : 0)) % 6], 'sign', { deco: 1, glow: 1 }));
     }
@@ -403,7 +436,7 @@ function buildMall() {
     boxes.push(B(-40, F2, -15 + r * 8, 6, 1.4, 1.0, 0xb8c8d8, 'metal'));
   }
   boxes.push(B(-52, F2, 24, 5, 2.1, 4, 0xcfc8bc, 'shelf'));
-  boxes.push(B(-45, F2 + 4.6, -34, 14, 1.2, 0.3, 0xc42a76, 'sign', { deco: 1, glow: 1 }));
+  boxes.push(B(-45, F2 + 4.6, -24.5, 14, 1.2, 0.3, 0xc42a76, 'sign', { deco: 1, glow: 1 }));
   for (const s of [-1, 1]) {
     const front = s * 7, back = s * 20, band = s * 24;
     boxes.push(...wallX(-34, -8, front, F2, 4, 0.5, [[-30, -26], [-16, -12]], SHOP));
@@ -473,7 +506,9 @@ function buildMall() {
 
   return {
     id: 'mall', name: 'ショッピングモール', boxes,
-    sky: 0x252a34, fog: { color: 0x2a303c, near: 34, far: 140 },
+    sky: 0x252a34, skyTop: 0x141826, skyBottom: 0x2c3340, skyExp: 0.9,
+    skySun: { dir: [0.35, 0.62, -0.7], color: 0xaeb8d6, size: 0.02, glow: 0.14 },
+    fog: { color: 0x2a303c, near: 34, far: 140 },
     ambient: 0.78, sun: 0.62, sunColor: 0xfff2dd,
     lights: [
       { x: 2, y: 8, z: 0, c: 0xffeecc, i: 34, d: 34 }, { x: -45, y: 7, z: 0, c: 0xffeecc, i: 24, d: 28 },
@@ -613,11 +648,10 @@ function buildSchool() {
   boxes.push(B(0, 0.35, -14, 5.2, 0.15, 3.2, 0x58b8e8, 'water', { deco: 1, glow: 1 }));
   for (const [px, pz] of [[-12, -18], [12, -18], [-12, -4], [12, -4]]) {
     boxes.push(B(px, 0, pz, 2.2, 0.6, 2.2, 0x8a6a44, 'wood'));
-    boxes.push(B(px, 0.6, pz, 1.4, 1.1, 1.4, 0x3f9b4f, 'leaf', { deco: 1 }));
+    canopy(boxes, px, pz, 0.6, 0.78, 0x4a9b52);
   }
   for (const [tx, tz] of [[-6, 3], [6, 3]]) {
-    boxes.push(B(tx, 0, tz, 0.7, 2.6, 0.7, 0x6a4a34, 'wood'));
-    boxes.push(B(tx, 2.4, tz, 3.6, 2.6, 3.6, 0xf0a8c0, 'leaf', { deco: 1 }));
+    tree(boxes, tx, tz, 2.6, 0.7, 1.9, 0xe89ab8, 0xf9d0e0);
   }
   for (const [bx, bz] of [[-3, -19], [3, -19], [-16, -10], [16, -10]]) boxes.push(B(bx, 0, bz, 2.4, 0.5, 0.8, 0xaa8866, 'wood'));
 
@@ -672,8 +706,8 @@ function buildSchool() {
   boxes.push(B(45.5, 3.2, -12, 6.4, 0.3, 8.4, 0x8a8478, 'tile'));
   boxes.push(B(46, 0, -14, 2.2, 1.2, 1.6, 0xc8a878, 'wood'));
   for (const [tx, tz] of [[49, -30], [49, -22], [49, 20], [49, 30], [4, 37], [-14, 37], [26, 37], [-49, -20], [-49, 0], [-49, 10], [-42, -34], [40, -34]]) {
-    boxes.push(B(tx, 0, tz, 0.7, 2.6, 0.7, 0x6a4a34, 'wood'));
-    boxes.push(B(tx, 2.4, tz, 3.4, 2.4, 3.4, ((tx + tz) & 1) ? 0xf7c1d4 : 0xf0a8c0, 'leaf', { deco: 1 }));
+    const warm = (tx + tz) & 1;
+    tree(boxes, tx, tz, 2.6, 0.7, 1.7, warm ? 0xe6a0bc : 0xd894b0, warm ? 0xf9d4e2 : 0xf6c8da);
   }
 
   const GLASS = 0x9fc8e8;
@@ -726,7 +760,9 @@ function buildSchool() {
   for (let i = 0; i < 3; i++) boxes.push(B(40 + i * 2.6, 0, 5, 1.6, 0.85, 0.14, [0xcc4455, 0x4477cc, 0x55aa66][i], 'metal', { deco: 1 }));
   return {
     id: 'school', name: '学校', boxes,
-    sky: 0xffb37a, fog: { color: 0xffc490, near: 55, far: 185 },
+    sky: 0xffb37a, skyTop: 0x4a5f9e, skyBottom: 0xffbe86, skyExp: 1.35,
+    skySun: { dir: [0.5, 0.32, 0.28], color: 0xffe6b4, size: 0.06, glow: 0.42 },
+    fog: { color: 0xffc490, near: 55, far: 185 },
     ambient: 0.65, sun: 0.9, sunColor: 0xffd9a8,
     lights: [{ x: -34, y: 6.5, z: 24, c: 0xfff4dd, i: 24, d: 28 }, { x: 0, y: 4, z: -10, c: 0xfff4dd, i: 16, d: 20 }, { x: 35, y: 4.5, z: 25, c: 0xfff4dd, i: 20, d: 24 }],
     bounds: { minX: -51, maxX: 51, minZ: -39, maxZ: 39 },

@@ -19,18 +19,25 @@ const gray = v => `rgb(${v | 0},${v | 0},${v | 0})`;
 
 const TEX_DRAW = {
   stone(g, S, r) {
-    g.fillStyle = gray(220); g.fillRect(0, 0, S, S);
-    for (let i = 0; i < 70; i++) {
-      g.fillStyle = gray(204 + r() * 34);
+    // 明色ではなめらかな漆喰/コンクリート、暗色に着色すると岩肌に見える控えめな質感
+    g.fillStyle = gray(223); g.fillRect(0, 0, S, S);
+    for (let i = 0; i < 24; i++) {
+      const v = 212 + r() * 24;
+      g.fillStyle = `rgba(${v | 0},${v | 0},${v | 0},0.09)`;
       g.beginPath();
-      g.ellipse(r() * S, r() * S, 5 + r() * 16, 4 + r() * 10, r() * 3.2, 0, 6.3);
+      g.ellipse(r() * S, r() * S, 12 + r() * 40, 9 + r() * 28, r() * 3.2, 0, 6.3);
       g.fill();
     }
-    g.strokeStyle = 'rgba(90,90,90,.28)'; g.lineWidth = 1;
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 850; i++) {
+      const v = 198 + r() * 52;
+      g.fillStyle = `rgba(${v | 0},${v | 0},${v | 0},0.45)`;
+      g.fillRect(r() * S, r() * S, 1, 1);
+    }
+    g.strokeStyle = 'rgba(120,120,120,.10)'; g.lineWidth = 1;
+    for (let i = 0; i < 3; i++) {
       let x = r() * S, y = r() * S;
       g.beginPath(); g.moveTo(x, y);
-      for (let k = 0; k < 4; k++) { x += r() * 34 - 17; y += r() * 34 - 17; g.lineTo(x, y); }
+      for (let k = 0; k < 5; k++) { x += r() * 28 - 14; y += r() * 28 - 14; g.lineTo(x, y); }
       g.stroke();
     }
   },
@@ -66,10 +73,15 @@ const TEX_DRAW = {
   },
   tile(g, S, r) {
     for (let i = 0; i < 4; i++) for (let j = 0; j < 4; j++) {
-      g.fillStyle = gray(229 + r() * 14);
+      g.fillStyle = gray(228 + r() * 14);
       g.fillRect(i * 32, j * 32, 32, 32);
+      g.fillStyle = 'rgba(255,255,255,.05)';
+      g.beginPath();
+      g.moveTo(i * 32, j * 32 + 32); g.lineTo(i * 32 + 32, j * 32);
+      g.lineTo(i * 32 + 32, j * 32 + 11); g.lineTo(i * 32 + 11, j * 32 + 32);
+      g.closePath(); g.fill();
     }
-    g.strokeStyle = 'rgba(125,125,130,.55)'; g.lineWidth = 2;
+    g.strokeStyle = 'rgba(120,122,130,.38)'; g.lineWidth = 1.5;
     for (let k = 0; k <= 4; k++) {
       g.beginPath(); g.moveTo(k * 32, 0); g.lineTo(k * 32, S); g.stroke();
       g.beginPath(); g.moveTo(0, k * 32); g.lineTo(S, k * 32); g.stroke();
@@ -98,22 +110,29 @@ const TEX_DRAW = {
     }
   },
   leaf(g, S, r) {
-    g.fillStyle = gray(198); g.fillRect(0, 0, S, S);
-    for (let i = 0; i < 110; i++) {
-      g.fillStyle = gray(168 + r() * 74);
-      g.beginPath(); g.arc(r() * S, r() * S, 3 + r() * 8, 0, 6.3); g.fill();
+    g.fillStyle = gray(180); g.fillRect(0, 0, S, S);
+    for (let i = 0; i < 150; i++) {
+      g.fillStyle = gray(150 + r() * 100);
+      g.beginPath(); g.arc(r() * S, r() * S, 2.5 + r() * 7, 0, 6.3); g.fill();
+    }
+    for (let i = 0; i < 24; i++) {
+      g.fillStyle = 'rgba(70,70,70,.16)';
+      g.beginPath(); g.arc(r() * S, r() * S, 3 + r() * 6, 0, 6.3); g.fill();
     }
   },
   water(g, S, r) {
-    g.fillStyle = gray(232); g.fillRect(0, 0, S, S);
-    for (let i = 0; i < 16; i++) {
+    const grad = g.createLinearGradient(0, 0, S * 0.6, S);
+    grad.addColorStop(0, gray(240)); grad.addColorStop(1, gray(206));
+    g.fillStyle = grad; g.fillRect(0, 0, S, S);
+    for (let i = 0; i < 22; i++) {
       const y0 = r() * S;
-      g.strokeStyle = i % 2 ? 'rgba(255,255,255,.35)' : 'rgba(110,135,150,.22)';
-      g.lineWidth = 1 + r() * 1.5;
+      g.strokeStyle = i % 2 ? 'rgba(255,255,255,.26)' : 'rgba(110,135,155,.16)';
+      g.lineWidth = 1 + r() * 1.4;
       g.beginPath(); g.moveTo(0, y0);
-      for (let x = 0; x <= S; x += 8) g.lineTo(x, y0 + Math.sin(x * 0.12 + i * 2) * 3);
+      for (let x = 0; x <= S; x += 8) g.lineTo(x, y0 + Math.sin(x * 0.1 + i * 1.7) * 3);
       g.stroke();
     }
+    for (let i = 0; i < 26; i++) { g.fillStyle = 'rgba(255,255,255,.45)'; g.fillRect(r() * S, r() * S, 1, 1); }
   },
   bone(g, S, r) {
     g.fillStyle = gray(236); g.fillRect(0, 0, S, S);
@@ -319,6 +338,59 @@ function scaleBoxUV(geo, b) {
   }
 }
 
+// ============================================================
+// グラデーション天球 (地平線→天頂 + 任意の太陽グロー)
+// ============================================================
+function addSky(scene, map) {
+  const top = new THREE.Color(map.skyTop ?? map.sky);
+  const bottom = new THREE.Color(map.skyBottom ?? map.fog.color);
+  const sun = map.skySun || null;
+  const uniforms = {
+    top: { value: top },
+    bottom: { value: bottom },
+    exponent: { value: map.skyExp ?? 0.85 },
+    sunDir: { value: sun ? new THREE.Vector3(...sun.dir).normalize() : new THREE.Vector3(0, 1, 0) },
+    sunColor: { value: new THREE.Color(sun ? sun.color : 0x000000) },
+    sunSize: { value: sun ? (sun.size ?? 0.04) : 0 },
+    sunGlow: { value: sun ? (sun.glow ?? 0.18) : 0 }
+  };
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false, uniforms,
+    vertexShader: `
+      varying vec3 vDir;
+      void main() {
+        vDir = normalize(position);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      uniform vec3 top, bottom, sunColor;
+      uniform vec3 sunDir;
+      uniform float exponent, sunSize, sunGlow;
+      varying vec3 vDir;
+      void main() {
+        vec3 d = normalize(vDir);
+        float h = clamp(d.y * 0.5 + 0.5, 0.0, 1.0);
+        vec3 col = mix(bottom, top, pow(h, exponent));
+        if (sunGlow > 0.0) {
+          float md = max(dot(d, normalize(sunDir)), 0.0);
+          float disc = smoothstep(1.0 - sunSize, 1.0 - sunSize * 0.35, md);
+          float halo = pow(md, 6.0) * sunGlow + pow(md, 60.0) * sunGlow * 2.0;
+          col += sunColor * (halo + disc);
+        }
+        gl_FragColor = vec4(col, 1.0);
+      }`
+  });
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(250, 32, 16), mat);
+  sky.frustumCulled = false;
+  sky.renderOrder = -1;
+  // カメラに追従させる → 視差なし & far平面でクリップされない
+  sky.onBeforeRender = (renderer, scn, cam) => {
+    sky.position.copy(cam.position);
+    sky.updateMatrixWorld(true);
+  };
+  scene.add(sky);
+}
+
 export function buildWorld(scene, mapId, quality) {
   const map = MAPS[mapId];
   const group = new THREE.Group();
@@ -340,15 +412,18 @@ export function buildWorld(scene, mapId, quality) {
     geos.forEach(g => g.dispose());
     const params = { color: parseInt(c), roughness: 0.85, metalness: 0.05 };
     if (m === 'metal') { params.roughness = 0.4; params.metalness = 0.5; }
-    if (m === 'tile') params.roughness = 0.55;
-    if (m === 'water') { params.roughness = 0.15; params.transparent = true; params.opacity = 0.85; }
+    if (m === 'tile') params.roughness = 0.5;
+    if (m === 'glass') { params.roughness = 0.08; params.metalness = 0.1; params.transparent = true; params.opacity = 0.6; }
+    if (m === 'water') { params.roughness = 0.12; params.metalness = 0.25; params.transparent = true; params.opacity = 0.72; }
     if (m === 'crystal') { params.transparent = true; params.opacity = 0.85; params.roughness = 0.2; }
-    if (glow === '1') { params.emissive = parseInt(c); params.emissiveIntensity = m === 'crystal' ? 0.9 : 0.6; }
+    // water は光源ではないので発光させない (ネオン化を防ぐ)
+    const emissive = glow === '1' && m !== 'water';
+    if (emissive) { params.emissive = parseInt(c); params.emissiveIntensity = m === 'crystal' ? 0.9 : 0.55; }
     const entry = texFor(m, parseInt(c));
     if (entry) {
       params.map = entry.tex;
       if (entry.full) params.color = 0xffffff;
-      if (glow === '1') {
+      if (emissive) {
         params.emissiveMap = entry.tex;
         if (entry.full) { params.emissive = 0xffffff; params.emissiveIntensity = 0.4; }
       }
@@ -361,8 +436,9 @@ export function buildWorld(scene, mapId, quality) {
   }
   scene.add(group);
 
-  scene.background = new THREE.Color(map.sky);
+  scene.background = new THREE.Color(map.skyBottom ?? map.fog.color);
   scene.fog = new THREE.Fog(map.fog.color, map.fog.near, map.fog.far);
+  addSky(scene, map);
   const hemi = new THREE.HemisphereLight(0xffffff, 0x334455, map.ambient);
   scene.add(hemi);
   const sun = new THREE.DirectionalLight(map.sunColor, map.sun);
