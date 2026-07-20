@@ -310,9 +310,9 @@ function windowFrame(boxes, x, y, z, w, h, orient, col = 0xf4efe4) {
 // ============================================================
 function buildCave() {
   const boxes = [];
-  const N = 90, OFF = -45, LH = 5;
+  const N = 112, OFF = -56, LH = 5;
 
-  boxes.push(B(0, -0.5, 0, 92, 0.5, 92, 0x40352b, 'dirt'));
+  boxes.push(B(0, -0.5, 0, 114, 0.5, 114, 0x40352b, 'dirt'));
 
   const H = [-11, 11, -11, 11];
   const L0 = [
@@ -349,6 +349,20 @@ function buildCave() {
     [18, 24, -33, -27],    // 北へ回り込む枝道 (北の大空洞へ別ルート)
     [18, 22, -33, -19],    // 上を [14,30,-19,-14] につなぐ縦坑
     [-24, -18, 20, 26],    // 南西の小空洞 (西回廊と南をつなぐ)
+    // --- v3.5 拡張: 外周を一周できる大回廊 + 四隅の新大空洞で複雑化・広域化 ---
+    // 大チャンバーから外周回廊へ抜ける連絡坑 (北1本のみ。中層回廊ループを1箇所だけ割るので
+    // ループは1本道として全連結を保ち、中層の分断ゼロ。外周は一周できる大escape回路)
+    [4, 10, -52, -39],     // 北チャンバー ↔ 北外周
+    // 外周大回廊 (床レベルを一周できるループ坑道。幅~5)
+    [-52, 52, -52, -47],   // 北 外周
+    [-52, 52, 47, 52],     // 南 外周
+    [47, 52, -47, 47],     // 東 外周
+    [-52, -47, -47, 47],   // 西 外周
+    // 四隅の新空洞 (外周回廊に接続。中層回廊(±40-44)の床を削らないよう±44の外側に置く)
+    [-53, -44, -53, -44],  // 北西 空洞
+    [44, 53, -53, -44],    // 北東 空洞
+    [44, 53, 44, 53],      // 南東 空洞
+    [-53, -44, 44, 53],    // 南西 空洞
   ];
 
   const r1 = [[-14, 14, -14, -11], [-14, 14, 11, 14], [-14, -11, -11, 11], [11, 14, -11, 11]];
@@ -524,10 +538,61 @@ function buildCave() {
     if (domeR() < 0.5) boulder(boxes, Math.cos(ang) * rad, 14.2, Math.sin(ang) * rad, 2.0 + domeR() * 1.6, 1.2, 2.0 + domeR() * 1.6, 0x241d16);
   }
 
+  // ---- v3.5 外周大回廊 & 四隅空洞の装飾 (すべて deco=当たり判定なし → ナビ不変) ----
+  // 四隅空洞: 群晶クリスタル + 石筍 + 転石 + 地底湖 で本物の洞窟チャンバーに
+  const outR = mulberry(3131);
+  const cornerCols = [0x66ffee, 0xbb88ff, 0x88ffcc, 0xffaa66];
+  const corners = [[-48.5, -48.5], [48.5, -48.5], [48.5, 48.5], [-48.5, 48.5]];
+  corners.forEach(([cx, cz], ci) => {
+    const cc = cornerCols[ci];
+    // 群晶: 尖った六角柱を数本
+    for (let s = 0; s < 5; s++) {
+      const ang = outR() * Math.PI * 2, dist = outR() * 1.4;
+      const h = 1.0 + outR() * 1.8, rad = 0.18 + outR() * 0.22, tilt = (outR() - 0.5) * 0.5;
+      boxes.push({ x: cx + Math.cos(ang) * dist, y: 0, z: cz + Math.sin(ang) * dist,
+        w: rad * 2, h, d: rad * 2, c: cc, m: 'crystal', deco: 1, glow: 1,
+        shape: 'cyl', rt: 0.04, rb: 1, seg: 6, rx: Math.sin(ang) * tilt, rz: -Math.cos(ang) * tilt });
+    }
+    // 石筍・転石を散らす
+    for (let s = 0; s < 4; s++) {
+      const px = cx + (outR() - 0.5) * 7, pz = cz + (outR() - 0.5) * 7;
+      drip(boxes, px, 0, pz, 0.4 + outR() * 0.3, 1.4 + outR() * 1.6, true, 0x51443a);
+      boulder(boxes, px + 0.4, 0.25, pz - 0.3, 1.0 + outR(), 0.6, 1.0 + outR(), outR() < 0.5 ? 0x4a3d30 : 0x574839);
+    }
+    // 天井から鍾乳石
+    for (let s = 0; s < 3; s++) drip(boxes, cx + (outR() - 0.5) * 6, LH, cz + (outR() - 0.5) * 6, 0.28, 1.0 + outR() * 1.4, false, 0x4a3d30);
+  });
+  // 四隅の地底湖 (北西と南東)
+  for (const [wx, wz] of [[-48, -48], [48, 48]]) {
+    boxes.push(B(wx, -0.08, wz, 6, 0.2, 5, 0x2b6f8f, 'water', { deco: 1, glow: 1 }));
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      boulder(boxes, wx + Math.cos(a) * 3.3, 0.1, wz + Math.sin(a) * 2.8, 1.1, 0.6, 1.1, outR() < 0.5 ? 0x4a3d30 : 0x574839);
+    }
+  }
+  // 外周大回廊: 石筍・転石・光るキノコ・クリスタルを一定間隔で配し道標に
+  for (let t = 0; t < 40; t++) {
+    const ang = (t / 40) * Math.PI * 2;
+    const rx = 49.5 + (outR() - 0.5) * 2.4, rz = 49.5 + (outR() - 0.5) * 2.4;
+    const px = Math.cos(ang) * rx, pz = Math.sin(ang) * rz;
+    // 回廊の中心線付近に低い装飾のみ (通行を塞がない)
+    if (outR() < 0.5) drip(boxes, px, 0, pz, 0.32, 1.0 + outR() * 1.2, true, 0x51443a);
+    else boulder(boxes, px, 0.12, pz, 0.8 + outR() * 0.6, 0.35, 0.8 + outR() * 0.6, outR() < 0.5 ? 0x4a3d30 : 0x574839);
+    if (outR() < 0.22) {
+      const gc = cornerCols[(outR() * 4) | 0];
+      boxes.push(B(px, 0.15, pz, 0.26, 0.6 + outR() * 0.4, 0.26, gc, 'crystal', { deco: 1, glow: 1 }));
+    }
+    if (outR() < 0.28) drip(boxes, px, LH, pz, 0.22, 0.8 + outR(), false, 0x4a3d30);
+    if (outR() < 0.14) { // 光るキノコ
+      boxes.push(B(px, 0, pz, 0.5, 0.05, 0.5, 0x3f6a4a, 'leaf', { deco: 1 }));
+      boxes.push(B(px, 0.1, pz, 0.16, 0.5, 0.16, 0x9fe0b0, 'crystal', { deco: 1, glow: 1 }));
+    }
+  }
+
   return {
     id: 'cave', name: '地下洞窟', boxes,
     sky: 0x07070c, skyTop: 0x05050b, skyBottom: 0x12121e, skyExp: 1.1,
-    fog: { color: 0x0a0a12, near: 10, far: 58 },
+    fog: { color: 0x0a0a12, near: 10, far: 66 },
     ambient: 0.5, sun: 0.35, sunColor: 0x8899cc,
     lights: [
       { x: 0, y: 4, z: -9.5, c: 0x66ffee, i: 30, d: 24 }, { x: 16, y: 2, z: 0, c: 0x88aaff, i: 24, d: 20 },
@@ -535,13 +600,14 @@ function buildCave() {
       { x: 37, y: 2, z: -6, c: 0x66ffee, i: 24, d: 20 }, { x: -4, y: 2, z: 36, c: 0x88ffcc, i: 26, d: 22 },
       { x: -16, y: 12, z: -16, c: 0x66ffee, i: 24, d: 22 }, { x: 16, y: 12, z: 16, c: 0xbb88ff, i: 24, d: 22 }
     ],
-    bounds: { minX: -44, maxX: 44, minZ: -44, maxZ: 44 },
+    bounds: { minX: -55, maxX: 55, minZ: -55, maxZ: 55 },
     jail: { x: 11.5, y: 0, z: 33.5, w: 6, d: 6 },
     spawns: {
       oni: [[0, 0.1, 0], [2.5, 0.1, 2.5], [-2.5, 0.1, -2.5], [2.5, 0.1, -2.5], [-2.5, 0.1, 2.5], [0, 0.1, 4], [4, 0.1, 0], [-4, 0.1, 0]],
       run: [
         [-6, 0.1, -30], [6, 0.1, -33], [34, 0.1, 6], [-34, 0.1, -6], [0, 0.1, 32], [20, 0.1, -16],
-        [-16, 0.1, 18], [-30, 5.1, -42], [30, 5.1, 42], [16, 10.1, 0], [-32, 0.1, -18], [30, 0.1, 15]
+        [-16, 0.1, 18], [-30, 5.1, -42], [30, 5.1, 42], [16, 10.1, 0], [-32, 0.1, -18], [30, 0.1, 15],
+        [-45, 0.1, -45], [45, 0.1, -45], [45, 0.1, 45], [-45, 0.1, 45], [0, 0.1, -49], [49, 0.1, 0]
       ]
     }
   };
@@ -556,8 +622,13 @@ function buildMall() {
   const WH = 11;
 
   boxes.push(B(0, -0.5, 0, 114, 0.5, 62, F1C, 'tile'));
-  boxes.push(...wallX(-56, 56, -29.7, 0, WH, 0.8, [], WALL), ...wallX(-56, 56, 29.7, 0, WH, 0.8, [], WALL));
-  boxes.push(...wallZ(-30, 30, -55.7, 0, WH, 0.8, [], WALL), ...wallZ(-30, 30, 55.7, 0, WH, 0.8, [], WALL));
+  // v3.5: 東側に第3の核「ホームセンター(大型専門店)」を増築 → 床と外周壁を東へ拡張
+  boxes.push(B(64.85, -0.5, 0, 18.3, 0.5, 62, 0xe4e0d6, 'tile'));   // 増築棟の床(少し色違い)
+  boxes.push(...wallX(-56, 74, -29.7, 0, WH, 0.8, [], WALL), ...wallX(-56, 74, 29.7, 0, WH, 0.8, [], WALL));
+  boxes.push(...wallZ(-30, 30, -55.7, 0, WH, 0.8, [], WALL));
+  // 旧東外壁は増築棟との内壁に。大きな入口を3つ開ける(食品コート↔ホームセンター)
+  boxes.push(...wallZ(-30, 30, 55.7, 0, WH, 0.8, [[-22, -15], [-6, 1], [9, 16]], WALL));
+  boxes.push(...wallZ(-30, 30, 73.7, 0, WH, 0.8, [], WALL));        // 新・東外壁
 
   boxes.push(...wallZ(-30, 30, -34, 0, 4.6, 0.5, [[-23, -21], [-18, -13], [-3, 3], [13, 18], [21, 23]], WALL));
   boxes.push(...wallX(-55.7, -34, -26, 0, 3.2, 0.4, [[-52, -50], [-40, -38]], BACK));
@@ -770,12 +841,55 @@ function buildMall() {
   boxes.push(B(38.5, 0, -28.5, 2.2, 1.6, 1.2, 0x8a94a8, 'metal'));
   boxes.push(B(35, 4.7, -24, 6, 1.0, 0.3, 0xff5555, 'sign', { deco: 1, glow: 1 }));
 
+  // ==== v3.5 増築棟: ホームセンター(大型専門店) ====
+  // 縦(z方向)に走る陳列棚(ゴンドラ)を3列。各列を横通路で3分割 → 追いかけっこ向きの棚迷路。
+  const HC_SHELF = 0xbcb0a0, HC_SHELF2 = 0xa8b8c4;
+  const shelfSegs = [[-24, -9], [-6, 5], [8, 24]];   // 横通路 z:-9..-6, 5..8 を空ける
+  for (const [ax, col] of [[60, HC_SHELF], [64, HC_SHELF2], [68, HC_SHELF]]) {
+    for (const [z1, z2] of shelfSegs) {
+      boxes.push(B(ax, 0, (z1 + z2) / 2, 1.1, 2.0, z2 - z1, col, 'goods'));
+      boxes.push(B(ax, 2.0, (z1 + z2) / 2, 1.1, 0.25, z2 - z1, shade(col, 0.85), 'metal', { deco: 1 })); // 棚上の枠
+    }
+  }
+  // レジ列(入口の内側)
+  for (const cz of [-20, -12, -3, 6, 14, 22]) {
+    boxes.push(B(58.2, 0, cz, 1.4, 1.0, 1.3, 0xd0d5da, 'metal'));
+    boxes.push(B(58.2, 1.0, cz, 0.5, 0.5, 0.5, 0x2a3240, 'metal', { deco: 1 }));   // レジ端末
+  }
+  // 家電の展示(冷蔵庫・洗濯機っぽい白物家電の島)
+  for (let i = 0; i < 4; i++) {
+    boxes.push(B(71, 0, -22 + i * 3.0, 1.6, 2.0, 1.4, 0xeef0f2, 'metal'));
+    boxes.push(B(71, 2.0, -22 + i * 3.0, 1.6, 0.05, 1.4, 0x9fb0c0, 'metal', { deco: 1 }));
+  }
+  // 木材・パイプラック(NE、背の高い縦材=隠れながら抜けられる細い列)
+  for (let i = 0; i < 4; i++) boxes.push(B(71.5, 0, 12 + i * 1.4, 1.2, 3.2, 0.5, 0xb98a54, 'wood'));
+  // ガーデンセンター(SE寄り): 観葉植物の鉢を並べる(deco)
+  for (const [px, pz] of [[71, 20], [71, 24], [67, 26], [62, 26], [57.5, 26], [71.5, 27]]) {
+    boxes.push(B(px, 0, pz, 1.0, 0.5, 1.0, 0x8a7a64, 'wood', { deco: 1 }));
+    canopy(boxes, px, pz, 0.5, 0.66, 0x4a9b52);
+  }
+  // 入口・通路のサイン(deco glow)
+  for (const [sx, sz, sc] of [[55.9, -18.5, 0xffb14d], [55.9, -2.5, 0x54c2ff], [55.9, 12.5, 0x66e0aa]])
+    boxes.push(B(sx, 5.2, sz, 0.25, 1.0, 5.5, sc, 'sign', { deco: 1, glow: 1 }));
+  for (const ax of [60, 64, 68]) boxes.push(B(ax, 5.4, 0, 1.0, 0.7, 6, 0xf8f8f4, 'sign', { deco: 1, glow: 1 }));
+  boxes.push(B(64, 6.4, -26, 12, 1.4, 0.4, 0xff7a2e, 'sign', { deco: 1, glow: 1 }));  // 店名看板
+  // ショッピングカート(入口付近・deco)
+  for (const [cx, cz] of [[57, -24], [57.7, -24.5], [57, 27], [57.7, 27.5]]) {
+    boxes.push(B(cx, 0, cz, 0.6, 0.9, 1.0, 0xc0c8d0, 'metal', { deco: 1 }));
+  }
+  // 中央にトランポリン(モール名物)と積み上げパレット
+  boxes.push(B(64, 0, -22, 2.2, 0.45, 2.2, 0x66ddff, 'metal', { bounce: 1, glow: 1 }));
+  boxes.push(B(64, 0, 22, 2.0, 0.9, 1.6, 0xcaa06a, 'wood'));
+  boxes.push(B(64, 0.9, 22, 1.6, 0.7, 1.2, 0xb8905a, 'wood'));
+  // 増築棟の天井梁
+  for (const bz of [-16, 0, 16]) boxes.push(B(64.85, 10.5, bz, 17, 0.4, 0.6, shade(WALL, 0.9), 'stone', { deco: 1 }));
+
   // ---- モール外周壁のトリム(巾木・2F帯・付け柱・最上部コーニス) ----
   const MT = { col: WALL, trimCol: shade(WALL, 0.94), baseCol: 0xbfb8ab, floors: [F2], top: WH };
-  facade(boxes, 'x', -56, 56, -29.7, 1, 0.4, { ...MT, pilaster: 8 });   // 北 外壁
-  facade(boxes, 'x', -56, 56, 29.7, -1, 0.4, { ...MT, pilaster: 8 });   // 南 外壁
+  facade(boxes, 'x', -56, 74, -29.7, 1, 0.4, { ...MT, pilaster: 8 });   // 北 外壁
+  facade(boxes, 'x', -56, 74, 29.7, -1, 0.4, { ...MT, pilaster: 8 });   // 南 外壁
   facade(boxes, 'z', -30, 30, -55.7, 1, 0.4, { ...MT, pilaster: 8.5 }); // 西 外壁
-  facade(boxes, 'z', -30, 30, 55.7, -1, 0.4, { ...MT, pilaster: 8.5 }); // 東 外壁
+  facade(boxes, 'z', -30, 30, 73.7, -1, 0.4, { ...MT, pilaster: 8.5 }); // 東 外壁(増築)
   // 天井の梁を増やして単調さを消す(deco)
   for (const bz of [-22, -11, 11, 22]) boxes.push(B(0, 10.5, bz, 108, 0.4, 0.6, shade(WALL, 0.9), 'stone', { deco: 1 }));
   for (const bx of [-40, -20, 20, 40]) boxes.push(B(bx, 10.5, 0, 0.6, 0.4, 58, shade(WALL, 0.9), 'stone', { deco: 1 }));
@@ -789,16 +903,18 @@ function buildMall() {
     lights: [
       { x: 2, y: 8, z: 0, c: 0xffeecc, i: 34, d: 34 }, { x: -45, y: 7, z: 0, c: 0xffeecc, i: 24, d: 28 },
       { x: 49, y: 8, z: 0, c: 0xffeecc, i: 26, d: 28 }, { x: -20, y: 7, z: 0, c: 0xffeecc, i: 18, d: 22 },
-      { x: 26, y: 7, z: 0, c: 0xffeecc, i: 18, d: 22 }
+      { x: 26, y: 7, z: 0, c: 0xffeecc, i: 18, d: 22 }, { x: 64, y: 8, z: -8, c: 0xffeecc, i: 26, d: 30 },
+      { x: 64, y: 8, z: 16, c: 0xffeecc, i: 22, d: 26 }
     ],
-    bounds: { minX: -55, maxX: 55, minZ: -29, maxZ: 29 },
+    bounds: { minX: -55, maxX: 73, minZ: -29, maxZ: 29 },
     jail: { x: 35.5, y: 0, z: -27, w: 6, d: 3.5 },
     spawns: {
       oni: [[2, 0.1, -4.5], [5.5, 0.1, 0], [-1.5, 0.1, 0], [2, 0.1, 4.5], [5.5, 0.1, 4.5], [-1.5, 0.1, -4.5], [5.5, 0.1, -4.5], [-1.5, 0.1, 4.5]],
       run: [
         [-45, 0.1, 0], [-50, 0.1, -20], [-51, 0.1, -28], [50, 0.1, 12], [48, 0.1, -20],
         [-28, 0.1, -13], [18, 0.1, -13], [-28, 0.1, 15], [18, 0.1, 13],
-        [-20, 5.1, -13], [-20, 5.1, 13], [30, 5.1, 13]
+        [-20, 5.1, -13], [-20, 5.1, 13], [30, 5.1, 13],
+        [62, 0.1, -12], [70, 0.1, 0], [62, 0.1, 16], [58, 0.1, 24], [71, 0.1, -26]
       ]
     }
   };
@@ -814,8 +930,10 @@ function buildSchool() {
   const FLOORS = 4;
   const ROOF = FH * FLOORS;
   boxes.push(B(0, -0.5, 0, 106, 0.5, 82, 0xb99a6b, 'dirt'));
-  boxes.push(...wallX(-52, 52, -39.7, 0, 2.2, 0.5, [], FENCE, 'fence'), ...wallX(-52, 52, 39.7, 0, 2.2, 0.5, [], FENCE, 'fence'));
-  boxes.push(...wallZ(-40, 40, -51.7, 0, 2.2, 0.5, [], FENCE, 'fence'), ...wallZ(-40, 40, 51.7, 0, 2.2, 0.5, [], FENCE, 'fence'));
+  // v3.5: 校庭を南へ拡張(陸上トラック・グラウンド・部室棟)→ 地面と外周フェンスを南へ延長
+  boxes.push(B(0, -0.5, 46, 106, 0.5, 14, 0xb59468, 'dirt'));   // 南グラウンドの地面(z39..53)
+  boxes.push(...wallX(-52, 52, -39.7, 0, 2.2, 0.5, [], FENCE, 'fence'), ...wallX(-52, 52, 52.7, 0, 2.2, 0.5, [], FENCE, 'fence'));
+  boxes.push(...wallZ(-40, 53, -51.7, 0, 2.2, 0.5, [], FENCE, 'fence'), ...wallZ(-40, 53, 51.7, 0, 2.2, 0.5, [], FENCE, 'fence'));
 
 
   boxes.push(B(0, 0, -31, 68, 0.12, 14, 0x9aa4ae, 'tile'));
@@ -1046,6 +1164,51 @@ function buildSchool() {
   boxes.push(B(12, 0.005, 13.6, 20, 0.02, 0.1, 0xe8e0cc, 'dirt', { deco: 1 }));
   for (let i = 0; i < 3; i++) boxes.push(B(40 + i * 2.6, 0, 5, 1.6, 0.85, 0.14, [0xcc4455, 0x4477cc, 0x55aa66][i], 'metal', { deco: 1 }));
 
+  // ==== v3.5 南グラウンド(校庭拡張): 陸上トラック・部室棟・砂場・用具倉庫 ====
+  const TRK = 0xf0ead8, INF = 0x9fb27a;
+  const trkC = [-8, 46], trkRX = 30, trkRZ = 5.2;
+  boxes.push(B(trkC[0], 0.02, trkC[1], trkRX * 2 - 4, 0.03, trkRZ * 2 - 2.4, INF, 'tatami', { deco: 1 })); // 芝の内側
+  for (const rr of [1.0, 0.86, 0.72]) {                       // トラックの白線(楕円3周)
+    for (let t = 0; t < 100; t++) {
+      const a = (t / 100) * Math.PI * 2;
+      const x = trkC[0] + Math.cos(a) * trkRX * rr;
+      const z = trkC[1] + Math.sin(a) * trkRZ * (rr < 1 ? rr + 0.12 : 1);
+      boxes.push(B(x, 0.04, z, 0.5, 0.012, 0.12, TRK, 'tile', { deco: 1 }));
+    }
+  }
+  // ゴールポスト(両端・細い=deco)
+  for (const gx of [-34, 18]) {
+    boxes.push(B(gx, 0, 47.5, 0.14, 2.4, 0.14, 0xffffff, 'metal', { deco: 1 }));
+    boxes.push(B(gx, 0, 44.5, 0.14, 2.4, 0.14, 0xffffff, 'metal', { deco: 1 }));
+    boxes.push(B(gx, 2.4, 46, 0.14, 0.14, 3.2, 0xffffff, 'metal', { deco: 1 }));
+  }
+  // 部室棟(西端): 北面を開けた小部屋の列 = 隠れ場所。屋根つき。
+  const CLUB = 0xcbb58c;
+  boxes.push(...wallX(-51, -39, 50.5, 0, 3.0, 0.4, [], CLUB));                       // 背面(南)
+  for (const dx of [-51, -47, -43, -39]) boxes.push(...wallZ(46.5, 50.5, dx, 0, 3.0, 0.4, [], CLUB)); // 仕切り
+  boxes.push(B(-45, 3.2, 48.5, 12.6, 0.3, 4.4, 0x8a7a64, 'tile', { deco: 1 }));      // 屋根
+  for (const rx of [-49, -45, -41]) boxes.push(B(rx, 0, 48.5, 1.2, 1.0, 1.0, 0x9a8a74, 'locker')); // 部室内の棚
+  boxes.push(B(-45, 3.6, 46.2, 8, 0.8, 0.3, 0x8060c0, 'sign', { deco: 1, glow: 1 }));
+  // 走り幅跳びの砂場
+  boxes.push(B(24, 0.03, 49, 6, 0.06, 3, 0xe6d8a8, 'dirt', { deco: 1 }));
+  for (const [px, pz] of [[21, 47.5], [27, 47.5], [21, 50.5], [27, 50.5]]) boxes.push(B(px, 0.12, pz, 0.16, 0.28, 0.16, 0xb08a54, 'wood', { deco: 1 }));
+  // 用具倉庫(東端の小屋・扉つき)
+  boxes.push(...wallX(38, 49.5, 48, 0, 3.2, 0.4, [[42, 45]], 0x9a8a74));             // 北面(扉)
+  boxes.push(...wallX(38, 49.5, 52, 0, 3.2, 0.4, [], 0x9a8a74));                     // 南面
+  boxes.push(...wallZ(48, 52, 38, 0, 3.2, 0.4, [], 0x9a8a74), ...wallZ(48, 52, 49.5, 0, 3.2, 0.4, [], 0x9a8a74));
+  boxes.push(B(43.75, 3.4, 50, 12.5, 0.3, 4.4, 0x8a8478, 'tile', { deco: 1 }));      // 屋根
+  boxes.push(B(47, 0, 50.5, 1.4, 1.4, 1.2, 0x8a6a44, 'wood'), B(40, 0, 50.5, 1.2, 1.0, 1.2, 0x8a6a44, 'wood'));
+  // トラック沿いのベンチ
+  for (const bx of [-20, -8, 4]) boxes.push(B(bx, 0, 40.5, 2.4, 0.45, 0.7, 0xaa8866, 'wood'));
+  // スコアボード(deco)
+  boxes.push(B(-8, 0, 52, 0.4, 2.6, 0.4, 0x8a8478, 'metal', { deco: 1 }));
+  boxes.push(B(-8, 2.6, 52, 5, 1.6, 0.3, 0x22303a, 'sign', { deco: 1, glow: 1 }));
+  // 南グラウンドの桜・木
+  for (const [tx, tz] of [[-46, 42], [-30, 52], [0, 52.2], [14, 52], [46, 44], [-16, 40], [34, 52]]) {
+    const warm = (tx + tz) & 1;
+    tree(boxes, tx, tz, 2.6, 0.7, 1.7, warm ? 0xe6a0bc : 0xd894b0, warm ? 0xf9d4e2 : 0xf6c8da);
+  }
+
   // ---- 校舎の外観トリム(巾木・各階回り縁・付け柱・笠木) & 窓枠 ----
   const FLY = [FH, FH * 2, FH * 3], FTOP = ROOF, FT = { col: WALL, floors: FLY, top: FTOP };
   const npil = [-33, 33]; for (let x = -27.5; x <= 27.5; x += 5) npil.push(x);
@@ -1073,14 +1236,15 @@ function buildSchool() {
     fog: { color: 0xffc490, near: 55, far: 185 },
     ambient: 0.65, sun: 0.9, sunColor: 0xffd9a8,
     lights: [{ x: -34, y: 6.5, z: 24, c: 0xfff4dd, i: 24, d: 28 }, { x: 0, y: 4, z: -10, c: 0xfff4dd, i: 16, d: 20 }, { x: 35, y: 4.5, z: 25, c: 0xfff4dd, i: 20, d: 24 }],
-    bounds: { minX: -51, maxX: 51, minZ: -39, maxZ: 39 },
+    bounds: { minX: -51, maxX: 51, minZ: -39, maxZ: 52 },
     jail: { x: -24.5, y: 0, z: 31, w: 4.5, d: 5 },
     spawns: {
       oni: [[4, 0.1, 16], [-2, 0.1, 20], [1, 0.1, 18], [4, 0.1, 20], [8, 0.1, 14], [0, 0.1, 14], [12, 0.1, 18], [4, 0.1, 12]],
       run: [
         [-28, 0.3, -26], [28, 0.3, -26], [0, 0.3, -26], [-22, 0.3, -8], [22, 0.3, -8], [0, 0.1, -10],
         [-12, FH + 0.3, -26], [12, FH * 2 + 0.3, -26], [0, FH * 3 + 0.3, -26], [0, ROOF + 0.1, -31],
-        [-34, 0.3, 24], [35, 0.4, 25], [11, 0.3, -33], [45, 0.1, -2]
+        [-34, 0.3, 24], [35, 0.4, 25], [11, 0.3, -33], [45, 0.1, -2],
+        [-8, 0.1, 46], [-30, 0.1, 44], [12, 0.1, 46], [-45, 0.1, 48], [30, 0.1, 43]
       ]
     }
   };
