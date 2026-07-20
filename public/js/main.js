@@ -732,8 +732,8 @@ function loop(t) {
       if (r.id === g.meId || r.role !== 'run' || r.jailed || r.frozen) continue;
       const rp = r.hum.root.position;
       const dx = rp.x - g.pos.x, dz = rp.z - g.pos.z;
-      if (dx * dx + dz * dz < 0.95 * 0.95 && Math.abs(rp.y - g.pos.y) < 1.3) {
-        if (now - (g.lastCatchReq || 0) > 250) {
+      if (dx * dx + dz * dz < 1.2 * 1.2 && Math.abs(rp.y - g.pos.y) < 1.5) {
+        if (now - (g.lastCatchReq || 0) > 180) {
           g.lastCatchReq = now;
           net.touchPlayer(r.id);
         }

@@ -8,7 +8,7 @@ import { Server } from 'socket.io';
 import { MAPS, solidsOf } from '../public/shared/mapdata.js';
 import { getPlayer, saveResults, saveCpuResult, topPlayers } from './store.js';
 import { computeDeltas, computeCpuDelta } from './rating.js';
-import { NavGrid } from './nav.js';
+import { NavGrid, losBlocked } from './nav.js';
 import { BotBrain, cpuLevelOf, CPU_LEVEL_NAMES, botName } from './bots.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,8 +23,8 @@ const PORT = process.env.PORT || 3000;
 
 const MODES = { doro: '泥警', koori: '氷鬼', kawari: '代わり鬼' };
 const MAX_PLAYERS = 10;
-const CATCH_RANGE = 1.25;
-const CATCH_DY = 1.4;
+const CATCH_RANGE = 1.35;
+const CATCH_DY = 1.5;
 const CATCH_LAG_SLACK = 1.2;
 const NO_CATCH_WHISTLE_MS = 30000;
 const TOUCH_RANGE = 1.7;
@@ -32,6 +32,18 @@ const GRACE_MS = 5000;
 const SWAP_IMMUNE_MS = 3000;
 
 const players = new Map(); // socket.id -> {socket, name, deviceId, rating, cpuRating, games, wins, roomId}
+
+// 捕獲の視線判定に使う固体リストをマップ単位でキャッシュ (CPU戦以外でも使うため独立)
+const solidsCache = new Map();
+function solidsFor(mapId) {
+  if (!solidsCache.has(mapId)) solidsCache.set(mapId, solidsOf(MAPS[mapId]));
+  return solidsCache.get(mapId);
+}
+// 鬼と逃げの間に壁があれば捕獲を無効化 (壁越しキャッチ防止)。胸の高さで判定し低い什器は無視。
+function catchBlocked(mapId, a, b) {
+  const h = Math.max(a[1], b[1]) + 0.85;
+  return losBlocked([a[0], h, a[2]], [b[0], h, b[2]], solidsFor(mapId));
+}
 
 const navCache = new Map();
 function navOf(mapId) {
@@ -244,18 +256,21 @@ class Room {
     const g = this.game; if (!g || g.over) return;
     const now = Date.now();
     if (now < g.graceUntil) return;
-    for (const oni of g.players.values()) {
-      if (oni.role !== 'oni' || oni.jailed || oni.frozen) continue;
+    // 鬼はtick開始時点のスナップショットで固定 (代わり鬼で入れ替わった直後の二重処理を防ぐ)。
+    // 各鬼につき最も近い逃げを1人捕まえる → 複数鬼が同tickで取りこぼさない。
+    const onis = [...g.players.values()].filter(p => p.role === 'oni' && !p.jailed && !p.frozen);
+    for (const oni of onis) {
+      if (oni.role !== 'oni' || oni.jailed || oni.frozen) continue; // onHitで役割が変わり得るため再確認
+      let best = null, bestD2 = Infinity;
       for (const tp of g.players.values()) {
         if (tp.id === oni.id || tp.role !== 'run' || tp.jailed || tp.frozen) continue;
         if (now < tp.immuneUntil) continue;
         const dx = tp.pos[0] - oni.pos[0], dz = tp.pos[2] - oni.pos[2];
         const dy = Math.abs(tp.pos[1] - oni.pos[1]);
-        if (dx * dx + dz * dz < CATCH_RANGE * CATCH_RANGE && dy < CATCH_DY) {
-          this.onHit(oni, tp);
-          return;
-        }
+        const d2 = dx * dx + dz * dz;
+        if (d2 < CATCH_RANGE * CATCH_RANGE && dy < CATCH_DY && d2 < bestD2) { bestD2 = d2; best = tp; }
       }
+      if (best && !catchBlocked(this.mapId, oni.pos, best.pos)) this.onHit(oni, best);
     }
   }
 
@@ -295,6 +310,7 @@ class Room {
       if (tp.role !== 'run' || tp.jailed || tp.frozen || now < tp.immuneUntil) return;
       const d2 = Math.hypot(gp.pos[0] - tp.pos[0], gp.pos[2] - tp.pos[2]);
       if (d2 > CATCH_RANGE + CATCH_LAG_SLACK || Math.abs(gp.pos[1] - tp.pos[1]) > 1.6) return;
+      if (catchBlocked(this.mapId, gp.pos, tp.pos)) return;   // 壁越しキャッチ防止
       this.onHit(gp, tp);
       return;
     }
