@@ -84,11 +84,11 @@ function shade(hex, f) {
 // 多数の小さな立方体で丸い樹冠/茂みを近似 (すべて deco = 当たり判定なし)。
 // 角ばったキューブ1個ではなく細かいブロックの集合にして「もこもこ」した丸みを出す。
 function canopy(boxes, cx, cz, baseY, rad, color, mat = 'leaf', colorB) {
-  const ry = rad * 0.88;                 // 縦は少し潰した楕円体
+  const ry = rad * 0.9;                  // 縦は少し潰した楕円体
   const cy = baseY + rad * 0.24;         // 樹冠の中心高さ
-  const step = Math.max(0.32, rad * 0.46); // 小ブロック間隔 (小さいほど滑らか)
+  const step = Math.max(0.24, rad * 0.3); // 小ブロック間隔 (小さいほど滑らかな葉むら)
   const light = colorB !== undefined ? colorB : shade(color, 1.16);
-  const dark = shade(color, 0.82);
+  const dark = shade(color, 0.8);
   let n = (Math.round(cx * 91.7 + cz * 47.3 + baseY * 13.1) >>> 0);
   for (let gx = -rad; gx <= rad + 1e-3; gx += step) {
     for (let gy = -ry; gy <= ry + 1e-3; gy += step) {
@@ -97,9 +97,9 @@ function canopy(boxes, cx, cz, baseY, rad, color, mat = 'leaf', colorB) {
         const d = Math.hypot(nx, ny, nz);
         n = (n * 1664525 + 1013904223) >>> 0;
         const jit = n / 4294967296;            // 表面をゆらして塊感を消す
-        if (d > 0.72 + jit * 0.36) continue;
-        const sz = step * (1.6 - d * 0.5);      // 中心ほど大きく外周ほど小さく → 丸い輪郭
-        const col = ny > 0.2 && jit > 0.42 ? light : (ny < -0.35 ? dark : color);
+        if (d > 0.74 + jit * 0.3) continue;
+        const sz = step * (1.9 - d * 0.55);     // 隣と重ねて塊を消し、丸い葉むらにする
+        const col = ny > 0.15 && jit > 0.4 ? light : (ny < -0.35 ? dark : (jit > 0.7 ? shade(color, 0.92) : color));
         boxes.push(B(cx + gx, cy + gy, cz + gz, sz, sz, sz, col, mat, { deco: 1 }));
       }
     }
@@ -167,6 +167,37 @@ function windowFrame(boxes, x, y, z, w, h, orient, col = 0xf4efe4) {
     boxes.push(B(x, y, z - w / 2 - t, 0.14, h, t, col, 'stone', { deco: 1 }));
     boxes.push(B(x, y, z + w / 2 + t, 0.14, h, t, col, 'stone', { deco: 1 }));
   }
+}
+
+// 牢屋(檻)を「四方どこからでも出入りできる開いた檻」として建てる。
+//   角柱4本だけ当たり判定あり(細い)。縦格子・上枠・看板はすべて deco (すり抜け可)。
+//   各辺の中央に広い開口(=出入口)を設けるので、鬼に1箇所を固められて詰むことがない。
+function openJail(boxes, jail) {
+  const { x, z } = jail, hx = jail.w / 2, hz = jail.d / 2;
+  const H = 2.5;                     // 檻の高さ
+  const barC = 0x4a5058, postC = 0x2b3036;
+  const gap = 1.7;                   // 各辺の出入口の幅(体が余裕で通れる)
+  // 角柱(当たり判定あり・細い)。出入口は各辺中央なので角柱は通行の邪魔にならない。
+  for (const sx of [-1, 1]) for (const sz of [-1, 1])
+    boxes.push(B(x + sx * hx, 0, z + sz * hz, 0.14, H, 0.14, postC, 'metal'));
+  // 一辺ぶんの縦格子(中央を gap ぶん空ける)+ 上枠。すべて deco。
+  const side = (ax, az, bx, bz) => {
+    const len = Math.hypot(bx - ax, bz - az);
+    const ux = (bx - ax) / len, uz = (bz - az) / len;
+    const n = Math.max(2, Math.round(len / 0.4));
+    for (let i = 0; i <= n; i++) {
+      const t = (i / n) * len;
+      if (Math.abs(t - len / 2) < gap / 2) continue;   // 中央の出入口
+      boxes.push(B(ax + ux * t, 0, az + uz * t, 0.055, H - 0.1, 0.055, barC, 'metal', { deco: 1 }));
+    }
+    boxes.push(B((ax + bx) / 2, H - 0.08, (az + bz) / 2, Math.abs(bx - ax) + 0.14, 0.1, Math.abs(bz - az) + 0.14, postC, 'metal', { deco: 1 }));
+  };
+  side(x - hx, z - hz, x + hx, z - hz);   // 南
+  side(x - hx, z + hz, x + hx, z + hz);   // 北
+  side(x - hx, z - hz, x - hx, z + hz);   // 西
+  side(x + hx, z - hz, x + hx, z + hz);   // 東
+  // 天井を照らす吊り看板(発光)— 遠くからでも牢屋だと分かる目印
+  boxes.push(B(x, H + 0.42, z, 1.5, 0.5, 0.12, 0xff6a3a, 'sign', { deco: 1, glow: 1 }));
 }
 
 // ============================================================
@@ -335,16 +366,18 @@ function buildCave() {
     boxes.push(B(hx, 13.7, hz, 1.4, 1.1, 1.4, 0x2a2119, 'stone', { deco: 1 }));
   }
 
+  openJail(boxes, { x: 11.5, z: 33.5, w: 6, d: 6 });
+
   return {
     id: 'cave', name: '地下洞窟', boxes,
-    sky: 0x07070c, skyTop: 0x05050b, skyBottom: 0x12121e, skyExp: 1.1,
-    fog: { color: 0x0a0a12, near: 10, far: 58 },
-    ambient: 0.5, sun: 0.35, sunColor: 0x8899cc,
+    sky: 0x12121e, skyTop: 0x0d0d18, skyBottom: 0x242438, skyExp: 1.1,
+    fog: { color: 0x1c1c28, near: 18, far: 82 },
+    ambient: 1.6, sun: 0.32, sunColor: 0x9aa8d0,
     lights: [
-      { x: 0, y: 4, z: -9.5, c: 0x66ffee, i: 30, d: 24 }, { x: 16, y: 2, z: 0, c: 0x88aaff, i: 24, d: 20 },
-      { x: -16, y: 2, z: 0, c: 0x66ffee, i: 24, d: 20 }, { x: -34, y: 2, z: -33, c: 0xbb88ff, i: 26, d: 22 },
-      { x: 37, y: 2, z: -6, c: 0x66ffee, i: 24, d: 20 }, { x: -4, y: 2, z: 36, c: 0x88ffcc, i: 26, d: 22 },
-      { x: -16, y: 12, z: -16, c: 0x66ffee, i: 24, d: 22 }, { x: 16, y: 12, z: 16, c: 0xbb88ff, i: 24, d: 22 }
+      { x: 0, y: 4, z: -9.5, c: 0x8affe6, i: 44, d: 30 }, { x: 16, y: 2, z: 0, c: 0xa8c4ff, i: 36, d: 26 },
+      { x: -16, y: 2, z: 0, c: 0x8affe6, i: 36, d: 26 }, { x: -34, y: 2, z: -33, c: 0xcca0ff, i: 38, d: 28 },
+      { x: 37, y: 2, z: -6, c: 0x8affe6, i: 36, d: 26 }, { x: -4, y: 2, z: 36, c: 0xa0ffd8, i: 38, d: 28 },
+      { x: -16, y: 12, z: -16, c: 0x8affe6, i: 34, d: 28 }, { x: 16, y: 12, z: 16, c: 0xcca0ff, i: 34, d: 28 }
     ],
     bounds: { minX: -44, maxX: 44, minZ: -44, maxZ: 44 },
     jail: { x: 11.5, y: 0, z: 33.5, w: 6, d: 6 },
@@ -587,6 +620,8 @@ function buildMall() {
   for (const bz of [-22, -11, 11, 22]) boxes.push(B(0, 10.5, bz, 108, 0.4, 0.6, shade(WALL, 0.9), 'stone', { deco: 1 }));
   for (const bx of [-40, -20, 20, 40]) boxes.push(B(bx, 10.5, 0, 0.6, 0.4, 58, shade(WALL, 0.9), 'stone', { deco: 1 }));
 
+  openJail(boxes, { x: 35.5, z: -27, w: 6, d: 3.5 });
+
   return {
     id: 'mall', name: 'ショッピングモール', boxes,
     sky: 0x252a34, skyTop: 0x141826, skyBottom: 0x2c3340, skyExp: 0.9,
@@ -752,9 +787,7 @@ function buildSchool() {
   boxes.push(B(-32, 0, 30, 1.3, 1.0, 1.3, 0xcc6655, 'wood'), B(-28, 0, 18, 1.3, 1.3, 1.3, 0xcc6655, 'wood'));
   boxes.push(B(-34, 6.2, 16, 1.8, 1.2, 0.3, 0xffffff, 'metal', { deco: 1 }));
   boxes.push(B(-34, 6.2, 32, 1.8, 1.2, 0.3, 0xffffff, 'metal', { deco: 1 }));
-  boxes.push(...wallX(-27, -22, 28, 0, 3.0, 0.4, [[-26.2, -24.2]], 0x9a8a74));
-  boxes.push(...wallZ(28, 34, -27, 0, 3.0, 0.4, [], 0x9a8a74));
-  boxes.push(B(-23.5, 0, 33, 2.5, 0.9, 1.2, 0x8a7a64, 'wood'));
+  // (以前ここにあった牢屋を囲う高さ3mのL字壁は撤去。牢屋は openJail の開いた檻に置き換え、四方から出入りできるようにした)
 
   boxes.push(B(35, 0, 25, 22, 0.12, 18, 0xb08a54, 'wood'));
   boxes.push(B(33, 0.12, 25, 16, 0.1, 14, 0x9fb27a, 'tatami'));
@@ -866,6 +899,8 @@ function buildSchool() {
     }
   }
 
+  openJail(boxes, { x: 9, z: 29, w: 4.5, d: 5 });
+
   return {
     id: 'school', name: '学校', boxes,
     sky: 0xffb37a, skyTop: 0x4a5f9e, skyBottom: 0xffbe86, skyExp: 1.35,
@@ -874,7 +909,7 @@ function buildSchool() {
     ambient: 0.65, sun: 0.9, sunColor: 0xffd9a8,
     lights: [{ x: -34, y: 6.5, z: 24, c: 0xfff4dd, i: 24, d: 28 }, { x: 0, y: 4, z: -10, c: 0xfff4dd, i: 16, d: 20 }, { x: 35, y: 4.5, z: 25, c: 0xfff4dd, i: 20, d: 24 }],
     bounds: { minX: -51, maxX: 51, minZ: -39, maxZ: 39 },
-    jail: { x: -24.5, y: 0, z: 31, w: 4.5, d: 5 },
+    jail: { x: 9, y: 0, z: 29, w: 4.5, d: 5 },
     spawns: {
       oni: [[4, 0.1, 16], [-2, 0.1, 20], [1, 0.1, 18], [4, 0.1, 20], [8, 0.1, 14], [0, 0.1, 14], [12, 0.1, 18], [4, 0.1, 12]],
       run: [
