@@ -73,26 +73,99 @@ function carveRock(boxes, rects, baseY, height, N, off, cA, cB) {
   }
 }
 
-// 重なり合う箱で立体的・有機的な樹冠を作る (すべて deco = 当たり判定なし)
-function canopy(boxes, cx, cz, baseY, rad, color, mat = 'leaf') {
-  const blobs = [
-    [0, 0, 0, 1.0], [-0.52, 0.16, -0.4, 0.7], [0.55, 0.12, 0.32, 0.72],
-    [0.32, 0.36, -0.5, 0.6], [-0.42, 0.4, 0.46, 0.58], [0, 0.62, 0.02, 0.66]
-  ];
-  for (const [ox, oy, oz, sc] of blobs) {
-    const w = rad * 2 * sc;
-    boxes.push(B(cx + ox * rad, baseY + oy * rad, cz + oz * rad, w, w * 0.74, w, color, mat, { deco: 1 }));
+// 色を明暗させる (面取り風トリムや葉の陰影に使う)
+function shade(hex, f) {
+  const r = Math.min(255, Math.max(0, Math.round(((hex >> 16) & 255) * f)));
+  const g = Math.min(255, Math.max(0, Math.round(((hex >> 8) & 255) * f)));
+  const b = Math.min(255, Math.max(0, Math.round((hex & 255) * f)));
+  return (r << 16) | (g << 8) | b;
+}
+
+// 多数の小さな立方体で丸い樹冠/茂みを近似 (すべて deco = 当たり判定なし)。
+// 角ばったキューブ1個ではなく細かいブロックの集合にして「もこもこ」した丸みを出す。
+function canopy(boxes, cx, cz, baseY, rad, color, mat = 'leaf', colorB) {
+  const ry = rad * 0.88;                 // 縦は少し潰した楕円体
+  const cy = baseY + rad * 0.24;         // 樹冠の中心高さ
+  const step = Math.max(0.32, rad * 0.46); // 小ブロック間隔 (小さいほど滑らか)
+  const light = colorB !== undefined ? colorB : shade(color, 1.16);
+  const dark = shade(color, 0.82);
+  let n = (Math.round(cx * 91.7 + cz * 47.3 + baseY * 13.1) >>> 0);
+  for (let gx = -rad; gx <= rad + 1e-3; gx += step) {
+    for (let gy = -ry; gy <= ry + 1e-3; gy += step) {
+      for (let gz = -rad; gz <= rad + 1e-3; gz += step) {
+        const nx = gx / rad, ny = gy / ry, nz = gz / rad;
+        const d = Math.hypot(nx, ny, nz);
+        n = (n * 1664525 + 1013904223) >>> 0;
+        const jit = n / 4294967296;            // 表面をゆらして塊感を消す
+        if (d > 0.72 + jit * 0.36) continue;
+        const sz = step * (1.6 - d * 0.5);      // 中心ほど大きく外周ほど小さく → 丸い輪郭
+        const col = ny > 0.2 && jit > 0.42 ? light : (ny < -0.35 ? dark : color);
+        boxes.push(B(cx + gx, cy + gy, cz + gz, sz, sz, sz, col, mat, { deco: 1 }));
+      }
+    }
   }
 }
 
-// 幹 (下部は当たり判定あり) + 立体樹冠。canopyColorB があれば2色を混ぜる
+// 幹 (下部は当たり判定あり) + 立体樹冠。canopyColorB があれば明るい葉を混ぜる
 function tree(boxes, tx, tz, trunkH, trunkW, canR, colA, colB) {
   boxes.push(B(tx, 0, tz, trunkW, trunkH, trunkW, 0x6a4a34, 'wood'));
-  boxes.push(B(tx, trunkH, tz, trunkW * 0.82, canR * 0.5, trunkW * 0.82, 0x6a4a34, 'wood', { deco: 1 }));
-  canopy(boxes, tx, tz, trunkH - 0.2, canR, colA);
-  if (colB !== undefined) {
-    // 明るい花/葉を上面に少量重ねて立体感を出す
-    canopy(boxes, tx, tz, trunkH + canR * 0.32, canR * 0.62, colB);
+  // 幹上部を細くテーパーさせ、根元を少し広げて角の立ちを和らげる (deco)
+  boxes.push(B(tx, 0, tz, trunkW * 1.28, trunkW * 0.5, trunkW * 1.28, 0x5f4230, 'wood', { deco: 1 }));
+  boxes.push(B(tx, trunkH, tz, trunkW * 0.8, canR * 0.42, trunkW * 0.8, 0x6a4a34, 'wood', { deco: 1 }));
+  canopy(boxes, tx, tz, trunkH - canR * 0.18, canR, colA, 'leaf', colB);
+}
+
+// 花壇: 低い縁石(またぎ越せる高さ)+ 土 + 丸い花の盛り (すべて deco)
+function flowerBed(boxes, x, z, rad, col, colB) {
+  boxes.push(B(x, 0, z, rad * 2 + 0.5, 0.28, rad * 2 + 0.5, 0x9a8466, 'stone', { deco: 1 }));
+  boxes.push(B(x, 0.05, z, rad * 2 + 0.1, 0.24, rad * 2 + 0.1, 0x5a463a, 'dirt', { deco: 1 }));
+  canopy(boxes, x, z, 0.34, rad, col, 'leaf', colB);
+}
+
+// 壁面(直線)に建築トリムを deco で付与し、のっぺりした面に陰影と密度を出す。
+//   orient 'x': 壁がx方向に伸び面はz=fixed / 'z': 壁がz方向に伸び面はx=fixed
+//   faceSign: 面を出す向き(+1 / -1)。wallHalf: 壁厚の半分(面位置)。
+//   opt.floors: 水平モールを入れる高さ配列 / opt.top: 笠木の高さ(壁高) /
+//   opt.pilaster: 付け柱の間隔(0で無し) / opt.skip: 付け柱を避ける[a,b]範囲配列
+function facade(boxes, orient, a1, a2, fixed, faceSign, wallHalf, opt = {}) {
+  const col = opt.col ?? 0xd8ceba;
+  const trimCol = opt.trimCol ?? shade(col, 1.1);
+  const baseCol = opt.baseCol ?? shade(col, 0.7);
+  const put = (aa, bb, y, h, thick, c, out = 0) => {
+    const fp = fixed + faceSign * (wallHalf + out + thick / 2);
+    if (orient === 'x') boxes.push(B((aa + bb) / 2, y, fp, bb - aa, h, thick, c, 'stone', { deco: 1 }));
+    else boxes.push(B(fp, y, (aa + bb) / 2, thick, h, bb - aa, c, 'stone', { deco: 1 }));
+  };
+  put(a1, a2, 0, 0.55, 0.16, baseCol);                              // 巾木
+  for (const fy of (opt.floors || [])) put(a1, a2, fy - 0.16, 0.3, 0.12, trimCol);  // 各階の回り縁
+  if (opt.top !== undefined) put(a1 - 0.12, a2 + 0.12, opt.top - 0.3, 0.42, 0.26, trimCol); // 笠木
+  if (opt.pilaster || opt.pilasterAt) {
+    const span = a2 - a1, top = opt.top ?? 4, pw = opt.pilasterW ?? 0.62;
+    let ps = opt.pilasterAt;
+    if (!ps) { ps = []; const cnt = Math.max(1, Math.round(span / opt.pilaster)); for (let i = 0; i <= cnt; i++) ps.push(a1 + span * i / cnt); }
+    for (const p of ps) {
+      if ((opt.skip || []).some(([s, e]) => p > s - pw / 2 && p < e + pw / 2)) continue;
+      const y0 = opt.pilasterY0 ?? 0, hh = top - y0;
+      if (orient === 'x') boxes.push(B(p, y0, fixed + faceSign * (wallHalf + 0.05), pw, hh, 0.2, trimCol, 'stone', { deco: 1 }));
+      else boxes.push(B(fixed + faceSign * (wallHalf + 0.05), y0, p, 0.2, hh, pw, trimCol, 'stone', { deco: 1 }));
+    }
+  }
+}
+
+// 窓枠(細い縁取り)を deco で付ける。glassBox の位置とサイズに合わせる。
+function windowFrame(boxes, x, y, z, w, h, orient, col = 0xf4efe4) {
+  const t = 0.1, d = orient === 'x' ? 0.06 : w, dz = orient === 'x' ? w : 0.06;
+  // orient 'x': 面はz固定(法線z) → 枠は x-y 平面。'z': 面はx固定。
+  if (orient === 'x') {
+    boxes.push(B(x, y + h / 2 + t, z, w + t * 2, t, 0.14, col, 'stone', { deco: 1 }));
+    boxes.push(B(x, y - h / 2 - t, z, w + t * 2, t, 0.14, col, 'stone', { deco: 1 }));
+    boxes.push(B(x - w / 2 - t, y, z, t, h, 0.14, col, 'stone', { deco: 1 }));
+    boxes.push(B(x + w / 2 + t, y, z, t, h, 0.14, col, 'stone', { deco: 1 }));
+  } else {
+    boxes.push(B(x, y + h / 2 + t, z, 0.14, t, w + t * 2, col, 'stone', { deco: 1 }));
+    boxes.push(B(x, y - h / 2 - t, z, 0.14, t, w + t * 2, col, 'stone', { deco: 1 }));
+    boxes.push(B(x, y, z - w / 2 - t, 0.14, h, t, col, 'stone', { deco: 1 }));
+    boxes.push(B(x, y, z + w / 2 + t, 0.14, h, t, col, 'stone', { deco: 1 }));
   }
 }
 
@@ -504,6 +577,16 @@ function buildMall() {
   boxes.push(B(38.5, 0, -28.5, 2.2, 1.6, 1.2, 0x8a94a8, 'metal'));
   boxes.push(B(35, 4.7, -24, 6, 1.0, 0.3, 0xff5555, 'sign', { deco: 1, glow: 1 }));
 
+  // ---- モール外周壁のトリム(巾木・2F帯・付け柱・最上部コーニス) ----
+  const MT = { col: WALL, trimCol: shade(WALL, 0.94), baseCol: 0xbfb8ab, floors: [F2], top: WH };
+  facade(boxes, 'x', -56, 56, -29.7, 1, 0.4, { ...MT, pilaster: 8 });   // 北 外壁
+  facade(boxes, 'x', -56, 56, 29.7, -1, 0.4, { ...MT, pilaster: 8 });   // 南 外壁
+  facade(boxes, 'z', -30, 30, -55.7, 1, 0.4, { ...MT, pilaster: 8.5 }); // 西 外壁
+  facade(boxes, 'z', -30, 30, 55.7, -1, 0.4, { ...MT, pilaster: 8.5 }); // 東 外壁
+  // 天井の梁を増やして単調さを消す(deco)
+  for (const bz of [-22, -11, 11, 22]) boxes.push(B(0, 10.5, bz, 108, 0.4, 0.6, shade(WALL, 0.9), 'stone', { deco: 1 }));
+  for (const bx of [-40, -20, 20, 40]) boxes.push(B(bx, 10.5, 0, 0.6, 0.4, 58, shade(WALL, 0.9), 'stone', { deco: 1 }));
+
   return {
     id: 'mall', name: 'ショッピングモール', boxes,
     sky: 0x252a34, skyTop: 0x141826, skyBottom: 0x2c3340, skyExp: 0.9,
@@ -654,6 +737,9 @@ function buildSchool() {
     tree(boxes, tx, tz, 2.6, 0.7, 1.9, 0xe89ab8, 0xf9d0e0);
   }
   for (const [bx, bz] of [[-3, -19], [3, -19], [-16, -10], [16, -10]]) boxes.push(B(bx, 0, bz, 2.4, 0.5, 0.8, 0xaa8866, 'wood'));
+  // 中庭の花壇(彩りと密度を出す。当たり判定なし)
+  for (const [fx, fz, fc, fb] of [[-16, 3, 0xe4586a, 0xffd166], [16, 3, 0xf4a63a, 0xfff0a0], [-16, -20, 0xd05ac0, 0xffb3e6], [16, -20, 0x6a8ef4, 0xbfe0ff]])
+    flowerBed(boxes, fx, fz, 0.9, fc, fb);
 
   boxes.push(B(-34, 0, 24, 24, 0.12, 20, 0xd8b06a, 'wood'));
   boxes.push(...wallX(-46, -22, 14, 0, 7.5, 0.5, [[-40, -37], [-28, -25]], GYMC));
@@ -661,7 +747,8 @@ function buildSchool() {
   boxes.push(...wallZ(14, 34, -46, 0, 7.5, 0.5, [], GYMC));
   boxes.push(...wallZ(14, 34, -22, 0, 7.5, 0.5, [[21, 24]], GYMC));
   boxes.push(B(-43.5, 0, 24, 4, 1.1, 14, 0xb08a54, 'wood'));
-  boxes.push(...stairs(-41.2, 0, 18.5, 'w', 1.6, 4, 0.275, 0.4, 0xb08a54, 'wood'));
+  // ステージへ上がる階段はステージ本体の東側に配置(以前は本体に埋まって登れなかった)
+  boxes.push(...stairs(-39.4, 0, 24, 'w', 3.4, 5, 0.22, 0.5, 0xc0965c, 'wood'));
   boxes.push(B(-32, 0, 30, 1.3, 1.0, 1.3, 0xcc6655, 'wood'), B(-28, 0, 18, 1.3, 1.3, 1.3, 0xcc6655, 'wood'));
   boxes.push(B(-34, 6.2, 16, 1.8, 1.2, 0.3, 0xffffff, 'metal', { deco: 1 }));
   boxes.push(B(-34, 6.2, 32, 1.8, 1.2, 0.3, 0xffffff, 'metal', { deco: 1 }));
@@ -758,6 +845,27 @@ function buildSchool() {
   boxes.push(B(12, 0.005, 12.4, 20, 0.02, 0.1, 0xe8e0cc, 'dirt', { deco: 1 }));
   boxes.push(B(12, 0.005, 13.6, 20, 0.02, 0.1, 0xe8e0cc, 'dirt', { deco: 1 }));
   for (let i = 0; i < 3; i++) boxes.push(B(40 + i * 2.6, 0, 5, 1.6, 0.85, 0.14, [0xcc4455, 0x4477cc, 0x55aa66][i], 'metal', { deco: 1 }));
+
+  // ---- 校舎の外観トリム(巾木・各階回り縁・付け柱・笠木) & 窓枠 ----
+  const FLY = [FH, FH * 2, FH * 3], FTOP = ROOF, FT = { col: WALL, floors: FLY, top: FTOP };
+  const npil = [-33, 33]; for (let x = -27.5; x <= 27.5; x += 5) npil.push(x);
+  const zpil = [-37, 7]; for (let z = -19; z <= 1; z += 4) zpil.push(z);
+  facade(boxes, 'x', -34, 34, -38, -1, 0.25, { ...FT, pilasterAt: npil });      // 北 外壁
+  facade(boxes, 'z', -38, 8, -34, -1, 0.25, { ...FT, pilasterAt: zpil });       // 西 外壁
+  facade(boxes, 'z', -38, 8, 34, 1, 0.25, { ...FT, pilasterAt: zpil });         // 東 外壁
+  facade(boxes, 'x', -34, -20, 8, 1, 0.25, { ...FT, pilaster: 6, skip: [[-23.5, -20.8]] }); // 西棟 南端
+  facade(boxes, 'x', 20, 34, 8, 1, 0.25, { ...FT, pilaster: 6, skip: [[20.8, 23.5]] });     // 東棟 南端
+  facade(boxes, 'x', -20, 20, -24, 1, 0.25, { ...FT, pilaster: 5, pilasterW: 0.5, skip: [[-14, -10], [10, 14]] });   // 中庭側 廊下壁
+  facade(boxes, 'z', -24, 8, -20, 1, 0.25, { ...FT, pilaster: 5, pilasterW: 0.5, skip: [[-16, -13], [0, 3]] });      // 中庭側 西棟内壁
+  facade(boxes, 'z', -24, 8, 20, -1, 0.25, { ...FT, pilaster: 5, pilasterW: 0.5, skip: [[-16, -13], [0, 3]] });      // 中庭側 東棟内壁
+  for (let fl = 0; fl < FLOORS; fl++) {
+    const Y = fl * FH;
+    for (let wx = -30; wx <= 30; wx += 5) {
+      if (fl === 0 && wx === 0) continue;
+      windowFrame(boxes, wx, Y + 1.2, -38.5, 2.6, 1.5, 'x');
+    }
+  }
+
   return {
     id: 'school', name: '学校', boxes,
     sky: 0xffb37a, skyTop: 0x4a5f9e, skyBottom: 0xffbe86, skyExp: 1.35,
