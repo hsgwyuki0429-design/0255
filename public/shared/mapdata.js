@@ -1,12 +1,4 @@
 // ============================================================
-// マップデータ (実在の設計図・実在洞窟 準拠)
-//  - 学校: 文部省「鉄筋コンクリート造校舎の標準設計」(1950) 準拠
-//          普通教室7m×9m / 北側片廊下2.7m / 南面教室 / 両端階段
-//  - モール: Southdale Center (1956, Victor Gruen設計) 準拠
-//          ダンベル型 / 両端アンカー百貨店 / 中央ガーデンコート
-//  - 洞窟: 秋芳洞 (山口県美祢市) 観光コース準拠
-//          洞口→長淵→百枚皿→洞内富士→千畳敷→千町田→黄金柱
-//          →巌窟王→くらげの滝のぼり→五月雨御殿→黒谷口
 // ============================================================
 
 function B(x, y, z, w, h, d, c = 0x888888, m = 'stone', opt = {}) {
@@ -82,488 +74,553 @@ function carveRock(boxes, rects, baseY, height, N, off, cA, cB) {
 }
 
 // ============================================================
-// 地下洞窟 = 秋芳洞 (特別天然記念物・日本最大級の鍾乳洞)
-// 観光コース約1kmの実際の順路を再現:
-//   正面洞口(青天井)→長淵→百枚皿→洞内富士→広庭・千畳敷(大黒柱/傘づくし)
-//   →千町田→エレベーター口→黄金柱→巌窟王→くらげの滝のぼり
-//   →五月雨御殿(マリア観音)→黒谷口
-// 冒険コース(洞口横の岩壁を登る)と支洞も実在に倣って配置
 // ============================================================
 function buildCave() {
   const boxes = [];
-  const N = 90, OFF = -45, H = 12;
-  const ROCK_A = 0x483a2e, ROCK_B = 0x544435, RS = 0x5c4c3a;
-  const LIME = 0xcfc4a8, WATER = 0x1e5a6e;
+  const N = 90, OFF = -45, LH = 5;
 
   boxes.push(B(0, -0.5, 0, 92, 0.5, 92, 0x40352b, 'dirt'));
 
-  // 洞内空間 (実際の順路: 南=正面洞口 → 北=黒谷口 へ蛇行)
-  const R = [
-    [4, 18, 32, 44],      // 正面洞口・青天井 (高さ24mの洞口)
-    [13, 18, 18, 36],     // 冒険コース (洞口横の岩棚)
-    [6, 13, 18, 32],      // 長淵 (地下川沿いの通路)
-    [-8, 18, 4, 18],      // 百枚皿 (500枚超の畦石池)
-    [-16, -8, 4, 10],     // 連絡通路
-    [-32, -8, -4, 12],    // 広庭・洞内富士
-    [-34, -6, -20, -4],   // 千畳敷 (最大ホール・大黒柱/傘づくし)
-    [-6, 6, -16, -4],     // 千町田 (棚田状の畦石)
-    [6, 14, -14, -4],     // エレベーター口
-    [-4, 12, -28, -14],   // 黄金柱 (高さ15m・直径4mの石柱)
-    [12, 20, -30, -18],   // 巌窟王・くらげの滝のぼり
-    [-8, 12, -40, -28],   // 五月雨御殿 (マリア観音)
-    [-2, 4, -44, -40],    // 黒谷口 (三億年のタイムトンネル)
-    [-30, -24, -34, -20], // 支洞 (千畳敷側)
-    [-24, -8, -34, -30]   // 支洞 (五月雨御殿へ抜ける)
+  const H = [-11, 11, -11, 11];
+  const L0 = [
+    H,
+    [-3, 2, -27, -11],
+    [-16, 13, -39, -27],
+    [11, 27, -3, 3],
+    [27, 40, -9, 9],
+    [-2, 4, 11, 25],
+    [-7, 19, 25, 39],
+    [-27, -11, -4, 2],
+    [-40, -27, -11, 7],
+    [-35, -30, -30, -8],
+    [-30, -16, -33, -28],
+    [12, 18, -27, -19],
+    [14, 30, -19, -14],
+    [26, 33, -14, -9],
+    [27, 33, 9, 21],
+    [15, 33, 21, 26],
+    [-31, -25, 7, 21],
+    [-25, -9, 15, 21],
+    [-11, -7, 21, 31],
+    [4, 9, -19, -11],
+    [4, 16, -19, -15],
+    [-9, -4, 11, 19],
+    [-20, -11, 28, 31],
+    [-14, -10, -44, -39],
+    [40, 44, -2, 2],
+    [2, 6, 39, 44],
+    [-44, -40, -2, 2],
   ];
-  carveRock(boxes, R, 0, H, N, OFF, ROCK_A, ROCK_B);
-  boxes.push(B(0, H, 0, 92, 1, 92, 0x2e2620, 'stone', { deco: 1 }));
 
-  // --- 正面洞口 (青天井): 洞口の外光と滝 ---
-  boxes.push(B(11, 0.1, 43.4, 13, 9, 0.4, 0xbfe0ff, 'sign', { deco: 1, glow: 1 }));
-  boxes.push(B(6.5, 0, 41, 4, 0.2, 5, WATER, 'water', { deco: 1, glow: 1 }));
-  boxes.push(B(15, 0, 41.5, 1.6, 0.05, 3, 0x3f6a4a, 'leaf', { deco: 1 }));
-  boxes.push(B(9.5, 0, 38, 1.2, 0.05, 2, 0x4a7a55, 'leaf', { deco: 1 }));
+  const r1 = [[-14, 14, -14, -11], [-14, 14, 11, 14], [-14, -11, -11, 11], [11, 14, -11, 11]];
+  const L1 = [
+    [-44, 44, -44, -40],
+    [-44, 44, 40, 44],
+    [40, 44, -40, 40],
+    [-44, -40, -40, 40],
+    H, ...r1,
+    [-14, -10, -44, -33],
+    [30, 44, -2, 2],
+    [2, 6, 33, 44],
+    [-44, -30, -2, 2],
+    [20, 24, -40, -24],
+    [20, 34, -28, -24],
+    [33, 37, -24, -6],
+    [-34, -28, 19, 40],
+    [-26, -22, -40, -31],
+    [24, 28, 24, 40],
+    [-16.2, -14, -14, -11],
+    [14, 16.2, 11, 14],
+  ];
 
-  // --- 長淵: 通路西側を流れる地下川 ---
-  boxes.push(B(7.2, 0, 25, 2.4, 0.16, 14, WATER, 'water', { deco: 1 }));
-  boxes.push(B(7.5, 0, 34, 3, 0.16, 4, WATER, 'water', { deco: 1 }));
-  boxes.push(B(8.6, 0, 25, 0.5, 0.45, 13, RS));
+  const L2 = [
+    H, ...r1,
+    [-18, 18, -18, -14],
+    [-18, 18, 14, 18],
+    [-18, -14, -14, 14],
+    [14, 18, -14, 14],
+    [-2, 2, -44, -18],
+    [-2, 2, 18, 44],
+    [-30, -18, -2, 2],
+    [18, 30, -2, 2],
+    [30, 44, -2, 2],
+    [-44, -30, -2, 2],
+  ];
 
-  // --- 冒険コース: 岩棚の上を渡る (両端に岩の階段) ---
-  boxes.push(B(16, 0, 25, 4, 2.6, 10, RS));
-  boxes.push(...stairs(16, 0, 33.8, 'n', 3, 9, 0.289, 0.45, RS));
-  boxes.push(...stairs(16, 0, 16.1, 's', 3, 9, 0.289, 0.45, RS));
-  boxes.push(B(14.2, 2.6, 25, 0.12, 0.85, 10, 0x8a7a5a, 'rail', { deco: 1 }));
+  carveRock(boxes, L0, 0, LH, N, OFF, 0x483a2e, 0x544435);
+  carveRock(boxes, L1, LH, LH, N, OFF, 0x554637, 0x61503e);
+  carveRock(boxes, L2, LH * 2, LH, N, OFF, 0x625340, 0x6f5f49);
 
-  // --- 百枚皿: 段々に連なる畦石池 (西へ上る) ---
-  for (let k = 0; k < 7; k++) {
-    const x1 = 8 - 2 * (k + 1), x2 = 8 - 2 * k;
-    const h = 0.26 * (k + 1);
-    boxes.push(B((x1 + x2) / 2, 0, 11, 2, h, 10, LIME));
-    boxes.push(B((x1 + x2) / 2, h, 11, 1.7, 0.05, 9.4, 0x2b7f9f, 'water', { deco: 1, glow: 1 }));
-  }
-  boxes.push(B(1, 2.2, 16.8, 14, 0.6, 0.15, 0xe8dcc0, 'stone', { deco: 1 }));
+  const RS = 0x5c4c3a;
+  const SH = 5 / 16, SD = 0.6;
+  boxes.push(...stairs(-12, 0, -34.5, 'n', 3.4, 16, SH, SD, RS));
+  boxes.push(...stairs(34.5, 0, 0, 'e', 3.4, 16, SH, SD, RS));
+  boxes.push(...stairs(4, 0, 34.5, 's', 3.4, 16, SH, SD, RS));
+  boxes.push(...stairs(-34.5, 0, 0, 'w', 3.4, 16, SH, SD, RS));
+  boxes.push(...stairs(-9.7, 0, 4.6, 'n', 2.6, 16, SH, SD, RS));
+  boxes.push(...stairs(9.7, 0, -4.6, 's', 2.6, 16, SH, SD, RS));
+  boxes.push(...stairs(-6.4, LH, -12.5, 'w', 2.6, 16, SH, SD, RS));
+  boxes.push(...stairs(6.4, LH, 12.5, 'e', 2.6, 16, SH, SD, RS));
 
-  // --- 洞内富士: 末広がりの巨大石筍 ---
-  boxes.push(B(-24, 0, 4, 8, 1, 8, LIME));
-  boxes.push(B(-24, 1, 4, 6, 1, 6, 0xd8cdb0));
-  boxes.push(B(-24, 2, 4, 4.4, 1, 4.4, LIME));
-  boxes.push(B(-24, 3, 4, 3, 0.9, 3, 0xe4dac2));
-  boxes.push(B(-24, 3.9, 4, 1.6, 0.5, 1.6, 0xf0e8d4, 'stone', { deco: 1 }));
+  boxes.push(B(-29.5, 0, 19.8, 2.6, 2, 2.2, RS));
+  boxes.push(B(-24, 0, -31.8, 2.6, 2, 2.2, RS));
+  boxes.push(B(35, 0, -7, 2.6, 2, 2.4, RS));
+  boxes.push(B(26, 0, 24.8, 2.6, 2, 2.4, RS));
+  boxes.push(B(0, LH, -42, 2.6, 2.5, 2, RS));
+  boxes.push(B(0, LH, 42, 2.6, 2.5, 2, RS));
 
-  // --- 千畳敷: 大黒柱と傘づくし ---
-  boxes.push(B(-16, 0, -12, 2.4, H, 2.4, 0xbfb493));
-  boxes.push(B(-16, 0, -12, 3.6, 1.2, 3.6, LIME));
-  for (const [sx, sz] of [[-28, -10], [-26, -13], [-29, -14], [-25, -8], [-27, -16], [-30, -8]]) {
-    const l = 2.2 + (((sx * 7 + sz * 13) % 8) + 8) % 8 / 4;
-    boxes.push(B(sx, H - l, sz, 0.55, l, 0.55, 0xd8cdb0, 'stone', { deco: 1 }));
-  }
+  boxes.push(B(-6, 0, -6, 2.2, 10, 2.2, 0x554435));
+  boxes.push(B(6, 0, 6, 2.0, 10, 2.0, 0x554435));
+  boxes.push(B(0, 0, 6.5, 2.6, 1.0, 2.6, 0x5c4c3a), B(0, 1.0, 6.5, 1.6, 0.9, 1.6, 0x554435));
+  boxes.push(B(9, 0, -9, 2, 2.2, 2, 0x5c4c3a));
+  boxes.push(B(9, 2.2, -9, 1.8, 0.5, 1.8, 0x66ddff, 'crystal', { bounce: 1, glow: 1 }));
+  boxes.push(B(-6, 0, -33, 1.9, 0.5, 1.9, 0x8f7bff, 'crystal', { bounce: 1, glow: 1 }));
+  boxes.push(B(-36, 0, 3, 1.9, 0.5, 1.9, 0x66ddff, 'crystal', { bounce: 1, glow: 1 }));
+  boxes.push(B(0, 0, 36, 1.9, 0.5, 1.9, 0x8f7bff, 'crystal', { bounce: 1, glow: 1 }));
 
-  // --- 千町田: 棚田状の畦石と水たまり ---
-  for (let r = 0; r < 3; r++) {
-    const z = -6.5 - r * 2.6;
-    boxes.push(B(0, 0, z, 10, 0.2, 0.5, LIME));
-    boxes.push(B(0, 0, z - 1.3, 9.4, 0.06, 1.9, 0x2b7f9f, 'water', { deco: 1 }));
-  }
+  boxes.push(B(34, 0, 2, 9, 0.25, 10, 0x2b6f8f, 'water', { deco: 1, glow: 1 }));
+  boxes.push(B(-34, 0, -3, 6, 0.2, 5, 0x2b6f8f, 'water', { deco: 1 }));
+  boxes.push(B(-30.5, 0, 0, 3, 0.2, 3, 0x2b6f8f, 'water', { deco: 1 }));
 
-  // --- エレベーター口 (実際に洞内中間部にある) + 牢屋 ---
-  boxes.push(B(12.7, 0, -9, 2.2, H, 2.2, 0x8a94a8, 'metal'));
-  boxes.push(B(11.5, 1.1, -9, 0.15, 1.0, 1.4, 0x9fe8b8, 'sign', { deco: 1, glow: 1 }));
-  boxes.push(...wallX(7.2, 10.8, -6.8, 0, 1.1, 0.2, [[8.3, 9.7]], 0x8a7a5a, 'rail'));
-  boxes.push(...wallX(7.2, 10.8, -11.2, 0, 1.1, 0.2, [], 0x8a7a5a, 'rail'));
-  boxes.push(...wallZ(-11.2, -6.8, 7.2, 0, 1.1, 0.2, [], 0x8a7a5a, 'rail'));
+  for (let i = 0; i < 5; i++) boxes.push(B(8.7 + i * 1.5, 0, 30.4, 0.22, 3.0, 0.22, 0xe8e0d2, 'bone', { deco: 1 }));
+  boxes.push(B(11.5, 3.0, 33.5, 7, 0.3, 7, 0xd8cfc0, 'bone', { deco: 1 }));
+  boxes.push(B(4, 0, 36, 2.6, 0.8, 1.2, 0xd8cfc0, 'bone', { deco: 1 }));
+  boxes.push(B(16, 0, 27, 1.4, 1.0, 1.4, 0xe8e0d2, 'bone', { deco: 1 }));
 
-  // --- 黄金柱: 秋芳洞のシンボル (直径4m・金色に輝く石柱) ---
-  boxes.push(B(4, 0, -21, 5.2, 1.6, 5.2, 0xcaa43e, 'crystal', { glow: 1 }));
-  boxes.push(B(4, 0, -21, 3.8, H, 3.8, 0xd9b24a, 'crystal', { glow: 1 }));
-  boxes.push(B(4, 0, -21, 4.4, 4.5, 4.4, 0xd4ac44, 'crystal', { glow: 1 }));
-
-  // --- 巌窟王: 人の形をした石筍 ---
-  boxes.push(B(18, 0, -24, 1.3, 1.5, 1.3, LIME));
-  boxes.push(B(18, 1.5, -24, 0.95, 0.9, 0.95, 0xd8cdb0, 'stone', { deco: 1 }));
-  boxes.push(B(18, 2.4, -24, 0.6, 0.5, 0.6, 0xe4dac2, 'stone', { deco: 1 }));
-
-  // --- くらげの滝のぼり: 東壁のフローストーン ---
-  for (let i = 0; i < 4; i++) {
-    boxes.push(B(19.5, 0.5 + i * 2.4, -26 + i * 0.9, 0.7, 2.6, 2.2 - i * 0.3, 0xd0e4e8, 'crystal', { deco: 1, glow: 1 }));
-  }
-
-  // --- 五月雨御殿: 細い石柱が林立する広間 + マリア観音 ---
-  for (const [px, pz] of [[-4, -31], [2, -33], [8, -31], [-2, -37], [6, -37], [10, -34]]) {
-    boxes.push(B(px, 0, pz, 0.7, H, 0.7, 0xbfb493));
-    boxes.push(B(px, 0, pz, 1.2, 0.8, 1.2, LIME));
-  }
-  boxes.push(B(-6, 0, -37, 0.6, 1.1, 0.6, 0xf0ece0, 'stone', { deco: 1 }));
-  boxes.push(B(-6, 1.1, -37, 0.4, 0.5, 0.4, 0xf6f2e8, 'stone', { deco: 1 }));
-
-  // --- 黒谷口: 三億年のタイムトンネル (色が変わる光の輪) ---
-  for (let i = 0; i < 3; i++) {
-    const cc = [0xff8a5f, 0x8a6fff, 0x5fd4ff][i];
-    boxes.push(B(1, 0.1, -40.8 - i * 1.3, 4.6, 0.15, 0.3, cc, 'sign', { deco: 1, glow: 1 }));
-  }
-  boxes.push(B(1, 0.1, -43.5, 4, 4.5, 0.3, 0xbfd8ff, 'sign', { deco: 1, glow: 1 }));
-
-  // --- 鍾乳石・石筍・観光路の照明灯 ---
-  const stal = [[11, 30], [-4, 6], [-12, 8], [-30, 2], [-32, -16], [-10, -18], [0, -26], [10, -26], [-4, -34], [-20, -32], [-28, -26], [16, -20]];
+  const stal = [[-13, -35], [8, -31], [-33, -25], [30, -16], [-15, 17], [22, 23], [-36, 5], [36, 6], [12, 34], [-4, 28]];
   for (const [sx, sz] of stal) {
-    boxes.push(B(sx, 0, sz, 0.8, 2.0 + ((sx * 7 + sz * 13) % 10) / 8, 0.8, 0x51443a, 'stone', { deco: 1 }));
-    boxes.push(B(sx + 0.6, 0, sz - 0.4, 0.45, 1.0, 0.45, 0x51443a, 'stone', { deco: 1 }));
-  }
-  const stalac = [[9, 27], [3, 12], [-2, 15], [-20, 8], [-26, 6], [-14, -8], [-22, -14], [2, -10], [8, -18], [0, -32], [6, -34], [16, -26], [-26, -30], [-14, -32], [10, 38]];
-  for (const [sx, sz] of stalac) {
-    const h = 1.2 + (((sx * 5 + sz * 11) % 8) + 8) % 8 / 6;
-    boxes.push(B(sx, H - h, sz, 0.5, h, 0.5, 0x4a3d30, 'stone', { deco: 1 }));
-    boxes.push(B(sx + 0.45, H - 0.7, sz + 0.3, 0.28, 0.7, 0.28, 0x4a3d30, 'stone', { deco: 1 }));
-  }
-  const lamps = [[10.5, 36], [10.5, 22], [11, 8], [-12, 6], [-28, 8], [-30, -12], [-4, -8], [10, -16], [14, -28], [-4, -30], [1, -39], [-26, -22]];
-  for (const [lx, lz] of lamps) {
-    boxes.push(B(lx, 0, lz, 0.14, 0.85, 0.14, 0x3a342c, 'metal', { deco: 1 }));
-    boxes.push(B(lx, 0.85, lz, 0.3, 0.22, 0.3, 0xffd9a0, 'sign', { deco: 1, glow: 1 }));
+    boxes.push(B(sx, 0, sz, 0.8, 2.2 + ((sx * 7 + sz * 13) % 10) / 8, 0.8, 0x51443a, 'stone', { deco: 1 }));
+    boxes.push(B(sx + 0.6, 0, sz - 0.4, 0.45, 1.1, 0.45, 0x51443a, 'stone', { deco: 1 }));
   }
 
+  const stalac = [[0, -18], [-1, -24], [13, -1], [19, 1], [24, -17], [-13, 0], [-19, -2], [1, 14], [-1, 20], [-22, -30], [29, 14], [-27, 12], [-9, 29], [20, 23], [30, -12]];
+  for (const [sx, sz] of stalac) {
+    const h = 0.9 + (((sx * 5 + sz * 11) % 8) + 8) % 8 / 10;
+    boxes.push(B(sx, LH - h, sz, 0.5, h, 0.5, 0x4a3d30, 'stone', { deco: 1 }));
+    boxes.push(B(sx + 0.45, LH - 0.6, sz + 0.3, 0.28, 0.6, 0.28, 0x4a3d30, 'stone', { deco: 1 }));
+  }
+
+  const moss = [[-8, -8], [7, -4], [-10, -34], [10, -30], [30, 7], [-38, 5], [0, 27], [14, 36], [16, -24], [-28, 17]];
+  for (const [mx, mz] of moss) {
+    boxes.push(B(mx, 0, mz, 1.6 + (((mx + mz) % 3) + 3) % 3 * 0.5, 0.05, 1.3, 0x3f6a4a, 'leaf', { deco: 1 }));
+    boxes.push(B(mx + 1.1, 0, mz - 0.8, 0.8, 0.04, 0.7, 0x4a7a55, 'leaf', { deco: 1 }));
+  }
+
+  boxes.push(B(-3, 0, 33, 1.0, 0.22, 0.28, 0x5a4028, 'wood', { deco: 1 }));
+  boxes.push(B(-3, 0, 33, 0.28, 0.22, 1.0, 0x5a4028, 'wood', { deco: 1 }));
+  boxes.push(B(-3, 0.18, 33, 0.42, 0.55, 0.42, 0xffa030, 'crystal', { deco: 1, glow: 1 }));
+  boxes.push(B(-3, 0.6, 33, 0.2, 0.35, 0.2, 0xffd980, 'crystal', { deco: 1, glow: 1 }));
+
+  boxes.push(B(2, 0, 30, 1.8, 0.3, 0.5, 0xd8cfc0, 'bone', { deco: 1 }));
+  boxes.push(B(6.5, 0, 36.5, 0.9, 0.65, 0.9, 0xe8e0d2, 'bone', { deco: 1 }));
+  boxes.push(B(17, 0, 33, 2.2, 0.35, 0.7, 0xd8cfc0, 'bone', { deco: 1 }));
+  boxes.push(B(-5.5, 0, 28, 0.5, 0.9, 0.5, 0xe8e0d2, 'bone', { deco: 1 }));
+
+  for (const [wx, wz] of [[31, -1], [36, 4], [33, 6], [-34, -2]]) {
+    boxes.push(B(wx, 0.15, wz, 0.28, 0.7, 0.28, 0x55e8c0, 'crystal', { deco: 1, glow: 1 }));
+    boxes.push(B(wx + 0.4, 0.15, wz - 0.3, 0.2, 0.45, 0.2, 0x55e8c0, 'crystal', { deco: 1, glow: 1 }));
+  }
+
+  const crys = [
+    [0, 0, -9.5, 0x66ffee], [-9, 0, 3, 0xbb88ff], [16, 0, 0, 0x88aaff], [-16, 0, 0, 0x66ffee],
+    [-34, 0, -33, 0xbb88ff], [-6, 0, -36, 0x88ffcc], [37, 0, -6, 0x66ffee], [-36, 0, -8, 0xbb88ff],
+    [-4, 0, 36, 0x88ffcc], [16, 0, 36, 0xffaa66],
+    [-16, 10, -16, 0x66ffee], [16, 10, 16, 0xbb88ff], [12, 5, -12.8, 0x88aaff], [-12, 5, 12.8, 0x88ffcc]
+  ];
+  for (const [cx, cy, cz, cc] of crys) {
+    boxes.push(B(cx, cy, cz, 0.7, 1.6, 0.7, cc, 'crystal', { deco: 1, glow: 1 }));
+    boxes.push(B(cx + 0.5, cy, cz - 0.3, 0.4, 0.9, 0.4, cc, 'crystal', { deco: 1, glow: 1 }));
+  }
   return {
     id: 'cave', name: '地下洞窟', boxes,
-    sky: 0x07070c, fog: { color: 0x0a0a12, near: 10, far: 62 },
+    sky: 0x07070c, fog: { color: 0x0a0a12, near: 10, far: 58 },
     ambient: 0.5, sun: 0.35, sunColor: 0x8899cc,
     lights: [
-      { x: 11, y: 6, z: 38, c: 0xbfd8ff, i: 30, d: 26 }, { x: 0, y: 5, z: 11, c: 0x9fd4ff, i: 26, d: 22 },
-      { x: -24, y: 6, z: 6, c: 0xffd9a0, i: 24, d: 24 }, { x: -20, y: 7, z: -12, c: 0x9fd4ff, i: 26, d: 26 },
-      { x: 4, y: 6, z: -21, c: 0xffcf6a, i: 36, d: 26 }, { x: 10, y: 4, z: -9, c: 0xa8ffcf, i: 20, d: 18 },
-      { x: 2, y: 6, z: -34, c: 0x9fb8ff, i: 24, d: 24 }, { x: 1, y: 4, z: -42, c: 0xbfd8ff, i: 22, d: 18 }
+      { x: 0, y: 4, z: -9.5, c: 0x66ffee, i: 30, d: 24 }, { x: 16, y: 2, z: 0, c: 0x88aaff, i: 24, d: 20 },
+      { x: -16, y: 2, z: 0, c: 0x66ffee, i: 24, d: 20 }, { x: -34, y: 2, z: -33, c: 0xbb88ff, i: 26, d: 22 },
+      { x: 37, y: 2, z: -6, c: 0x66ffee, i: 24, d: 20 }, { x: -4, y: 2, z: 36, c: 0x88ffcc, i: 26, d: 22 },
+      { x: -16, y: 12, z: -16, c: 0x66ffee, i: 24, d: 22 }, { x: 16, y: 12, z: 16, c: 0xbb88ff, i: 24, d: 22 }
     ],
     bounds: { minX: -44, maxX: 44, minZ: -44, maxZ: 44 },
-    jail: { x: 9, y: 0, z: -9, w: 3.4, d: 3.6 },
+    jail: { x: 11.5, y: 0, z: 33.5, w: 6, d: 6 },
     spawns: {
-      oni: [[-24, 0.1, -12], [-21, 0.1, -9], [-27, 0.1, -9], [-21, 0.1, -15], [-27, 0.1, -15], [-24, 0.1, -8], [-24, 0.1, -16], [-19, 0.1, -16]],
+      oni: [[0, 0.1, 0], [2.5, 0.1, 2.5], [-2.5, 0.1, -2.5], [2.5, 0.1, -2.5], [-2.5, 0.1, 2.5], [0, 0.1, 4], [4, 0.1, 0], [-4, 0.1, 0]],
       run: [
-        [10, 0.1, 40], [9.5, 0.1, 26], [16, 2.7, 25], [11, 0.1, 8], [-13, 0.1, 7], [-28, 0.1, 8],
-        [8, 0.1, -26], [16, 0.1, -22], [2, 0.1, -34], [1, 0.1, -42], [-16, 0.1, -32], [0, 0.1, -12]
+        [-6, 0.1, -30], [6, 0.1, -33], [34, 0.1, 6], [-34, 0.1, -6], [0, 0.1, 32], [20, 0.1, -16],
+        [-16, 0.1, 18], [-30, 5.1, -42], [30, 5.1, 42], [16, 10.1, 0], [-32, 0.1, -18], [30, 0.1, 15]
       ]
     }
   };
 }
 
 // ============================================================
-// ショッピングモール = Southdale Center (1956, ミネソタ州)
-// Victor Gruen設計・世界初の完全屋内型モールの平面計画準拠:
-//   ダンベル型 = 両端に2つのアンカー百貨店 (Dayton's / Donaldson's)
-//   中央に2層吹抜けの「ガーデンコート」(泉・池・カフェ・彫刻・
-//   高さ約14mの巨大鳥かご) / 72の専門店が両側に並ぶ / 2層構成
 // ============================================================
 function buildMall() {
   const WALL = 0xf2efe9, F1C = 0xe8e4dc, F2C = 0xdfdbd2, SHOP = 0xcfc8bc, BACK = 0xb8b2a6;
   const boxes = [];
-  const F2 = 5, WH = 11;
+  const F2 = 5;
+  const WH = 11;
 
   boxes.push(B(0, -0.5, 0, 114, 0.5, 62, F1C, 'tile'));
   boxes.push(...wallX(-56, 56, -29.7, 0, WH, 0.8, [], WALL), ...wallX(-56, 56, 29.7, 0, WH, 0.8, [], WALL));
   boxes.push(...wallZ(-30, 30, -55.7, 0, WH, 0.8, [], WALL), ...wallZ(-30, 30, 55.7, 0, WH, 0.8, [], WALL));
 
-  // ============ アンカー百貨店 ×2 (ダンベルの両端) ============
-  for (const s of [-1, 1]) {
-    const xw = s * 34;                       // モール側の壁
-    boxes.push(...wallZ(-30, 30, xw, 0, F2, 0.5, [[-10, -4], [4, 10]], WALL));
-    boxes.push(...wallZ(-30, 30, xw, F2, WH - F2, 0.5, [[-10, -4], [4, 10]], WALL));
-    // 大看板 (西=桃色 Dayton's / 東=水色 Donaldson's)
-    boxes.push(B(s * 33.6, 8.0, 0, 0.3, 1.8, 18, s < 0 ? 0xc42a76 : 0x2a6fc4, 'sign', { deco: 1, glow: 1 }));
-    // 1F 売場: 商品棚の列
-    for (let r = 0; r < 6; r++) {
-      const gz = -17.5 + r * 7;
-      boxes.push(B(s * 50, 0, gz, 7, 1.9, 1.0, 0xbcc8d0, 'goods'));
-      boxes.push(B(s * 41, 0, gz, 7, 1.9, 1.0, 0x9fb8c8, 'goods'));
-    }
-    boxes.push(B(s * 54.9, 0, 0, 1.2, 1.9, 40, 0xbcc8d0, 'goods'));
-    boxes.push(B(s * 36.5, 0, -7, 1.1, 0.95, 2.6, 0xd0d5da, 'metal'));
-    boxes.push(B(s * 36.5, 0, 7, 1.1, 0.95, 2.6, 0xd0d5da, 'metal'));
-    // 2F 床 (階段孔を除く)
-    const sl = (x1, x2, z1, z2) => boxes.push(B((x1 + x2) / 2, F2 - 0.4, (z1 + z2) / 2, x2 - x1, 0.4, z2 - z1, F2C, 'tile'));
-    if (s < 0) {
-      sl(-55.5, -34, -30, -21.4); sl(-55.5, -46.2, -21.4, -18.6); sl(-40.1, -34, -21.4, -18.6); sl(-55.5, -34, -18.6, 30);
-      boxes.push(...stairs(-50.5, 0, -20, 'e', 2.4, 20, 0.25, 0.5, 0x99a0aa, 'metal'));
-    } else {
-      sl(34, 55.5, -30, 18.6); sl(34, 40.1, 18.6, 21.4); sl(46.2, 55.5, 18.6, 21.4); sl(34, 55.5, 21.4, 30);
-      boxes.push(...stairs(50.5, 0, 20, 'w', 2.4, 20, 0.25, 0.5, 0x99a0aa, 'metal'));
-    }
-    // 2F 売場
-    for (let r = 0; r < 4; r++) {
-      boxes.push(B(s * 50, F2, -12 + r * 8, 6, 1.4, 1.0, 0xd0aab8, 'metal'));
-      boxes.push(B(s * 41, F2, -12 + r * 8, 6, 1.4, 1.0, 0xb8c8d8, 'metal'));
-    }
-    boxes.push(B(s * 45, F2 + 4.2, 0, 10, 1.0, 0.3, s < 0 ? 0xc42a76 : 0x2a6fc4, 'sign', { deco: 1, glow: 1 }));
+  boxes.push(...wallZ(-30, 30, -34, 0, 4.6, 0.5, [[-23, -21], [-18, -13], [-3, 3], [13, 18], [21, 23]], WALL));
+  boxes.push(...wallX(-55.7, -34, -26, 0, 3.2, 0.4, [[-52, -50], [-40, -38]], BACK));
+  boxes.push(B(-45, 0, -24.9, 14, 1.2, 1.4, 0xd8e2e8, 'metal'));
+  for (let r = 0; r < 6; r++) {
+    const gz = -18 + r * 6;
+    boxes.push(B(-49.5, 0, gz, 7, 1.9, 1.0, 0xbcc8d0, 'goods'));
+    boxes.push(B(-40.5, 0, gz, 7, 1.9, 1.0, 0xbcc8d0, 'goods'));
   }
+  boxes.push(B(-54.9, 0, -10, 1.2, 1.9, 26, 0x9fb8c8, 'goods'));
+  boxes.push(B(-50, 0, 24, 4.5, 0.9, 3, 0x7aa86a, 'wood'), B(-42, 0, 24, 4.5, 0.9, 3, 0x7aa86a, 'wood'));
+  boxes.push(B(-36, 0, -8, 2.6, 0.95, 1.1, 0xd0d5da, 'metal'), B(-36, 0, 8, 2.6, 0.95, 1.1, 0xd0d5da, 'metal'));
+  boxes.push(B(-45, 4.8, -34, 16, 1.4, 0.3, 0xc42a76, 'sign', { deco: 1, glow: 1 }));
 
-  // ============ 専門店街 (南北2列・前面z=±10 / 奥行12m) ============
+  boxes.push(B(2, 0, 0, 5.2, 0.65, 5.2, 0xdfe8ee, 'tile'));
+  boxes.push(B(2, 0.65, 0, 3.8, 0.25, 3.8, 0x58b8e8, 'water', { deco: 1, glow: 1 }));
+  boxes.push(B(2, 0.65, 0, 0.9, 2.2, 0.9, 0xdfe8ee, 'tile'));
+  for (const [px, pz] of [[-5, -12], [9, -12], [-5, 12], [9, 12]]) {
+    boxes.push(B(px, 0, pz, 1.8, 0.75, 1.8, 0x8a7a64, 'wood'));
+    boxes.push(B(px, 0.75, pz, 1.1, 1.5, 1.1, 0x3f9b4f, 'leaf', { deco: 1 }));
+  }
+  for (const [bx, bz] of [[-5, -5], [9, 5], [-20, 5.8], [24, -5.8], [-30, -5.8], [34, 5.8]]) {
+    boxes.push(B(bx, 0, bz, 2.6, 0.55, 0.8, 0xb08a5f, 'wood'));
+  }
+  boxes.push(B(8, 0, -3, 2.2, 0.45, 2.2, 0xff8fb3, 'metal', { bounce: 1, glow: 1 }));
+  for (const lx of [-24, -14, 18, 28, 38]) boxes.push(B(lx, 10.4, 0, 8, 0.15, 1.2, 0xfff2dd, 'sign', { deco: 1, glow: 1 }));
+
   const shopColors = [0xff6b81, 0x54c2ff, 0xffd166, 0x8ce99a, 0xffa94d, 0x9b8cff];
-  const segs = [[-34, -26], [-26, -18], [-18, -11], [-11, -4], [-4, 4], [4, 11], [11, 18], [18, 26], [26, 34]];
+  const shopSegs = [[-34, -22], [-22, -8], [12, 24], [24, 34], [34, 42]];
   for (const s of [-1, 1]) {
-    const front = s * 10, back = s * 22;
-    for (let i = 0; i < segs.length; i++) {
-      const [x1, x2] = segs[i], cx = (x1 + x2) / 2;
-      // 1F 店舗
-      boxes.push(...wallX(x1, x2, front, 0, 4.6, 0.5, [[x1 + 1.4, x1 + 3.8], [x2 - 3.8, x2 - 1.4]], SHOP));
-      const bg = (i % 3 === 1) ? [[cx - 1.1, cx + 1.1]] : [];
-      boxes.push(...wallX(x1, x2, back, 0, 4.6, 0.4, bg, BACK));
+    const front = s * 7, back = s * 20, band = s * 24;
+    for (let i = 0; i < shopSegs.length; i++) {
+      const [x1, x2] = shopSegs[i];
+      const cx = (x1 + x2) / 2;
+      boxes.push(...wallX(x1, x2, front, 0, 4.6, 0.5, [[x1 + 1.5, x1 + 4], [x2 - 4, x2 - 1.5]], SHOP));
+      boxes.push(...wallX(x1, x2, back, 0, 4.6, 0.4, [[cx - 0.8, cx + 0.8]], BACK));
       if (x1 !== -34) boxes.push(...wallZ(Math.min(front, back), Math.max(front, back), x1, 0, 4.6, 0.4, [], SHOP));
-      boxes.push(B(cx, 4.7, front, (x2 - x1) - 2.2, 1.0, 0.3, shopColors[(i + (s === 1 ? 3 : 0)) % 6], 'sign', { deco: 1, glow: 1 }));
-      boxes.push(B(cx, 0, s * 18.5, 2.6, 0.95, 1.0, 0x9c8f80, 'wood'));
-      if (i % 2 === 0) boxes.push(B(cx - 1.5, 0, s * 14, 1.0, 1.5, 2.6, 0x7fa8d0, 'goods'));
-      else boxes.push(B(cx + 1.5, 0, s * 14.5, 2.6, 1.35, 1.1, 0xd0aab8, 'metal'));
-      // 2F 店舗
-      boxes.push(...wallX(x1, x2, front, F2, 4, 0.5, [[cx - 1.8, cx + 1.8]], SHOP));
-      boxes.push(...wallX(x1, x2, back, F2, 4, 0.4, [], BACK));
-      if (x1 !== -34) boxes.push(...wallZ(Math.min(front, back), Math.max(front, back), x1, F2, 4, 0.4, [], SHOP));
-      boxes.push(B(cx, F2 + 4.1, front, (x2 - x1) - 2.6, 0.9, 0.3, shopColors[(i + (s === 1 ? 1 : 4)) % 6], 'sign', { deco: 1, glow: 1 }));
-      boxes.push(B(cx, F2, s * 16, 2.6, 1.1, 1.0, 0xc8a878, 'wood'));
+      if (x2 !== 42) boxes.push(...wallZ(Math.min(front, back), Math.max(front, back), x2, 0, 4.6, 0.4, [], SHOP));
+      boxes.push(B(cx, 4.7, front, (x2 - x1) - 3, 1.1, 0.3, shopColors[(i + (s === 1 ? 3 : 0)) % 6], 'sign', { deco: 1, glow: 1 }));
     }
+    boxes.push(...wallX(-8, 12, s * 16, 0, 4.6, 0.5, [[0, 6]], SHOP));
+    boxes.push(B(-3.5, 0, s * 18, 5, 1.0, 1.2, 0xc9a06a, 'wood'));
+    boxes.push(B(9, 0, s * 18, 4, 1.0, 1.2, 0xc9a06a, 'wood'));
+    boxes.push(B(-3.5, 4.7, s * 16, 6, 1.0, 0.3, shopColors[s === 1 ? 4 : 1], 'sign', { deco: 1, glow: 1 }));
+    boxes.push(...wallX(-34, 42, band, 0, 4.6, 0.4, [[0.5, 2.5], [3.5, 5.5], [-27, -25], [33, 36]], BACK));
+    const tz1 = s * 24, tz2 = s * 30;
+    boxes.push(...wallZ(Math.min(tz1, tz2), Math.max(tz1, tz2), -6, 0, 4.6, 0.4, [], BACK));
+    boxes.push(...wallZ(Math.min(tz1, tz2), Math.max(tz1, tz2), 3, 0, 4.6, 0.4, [], BACK));
+    boxes.push(...wallZ(Math.min(tz1, tz2), Math.max(tz1, tz2), 12, 0, 4.6, 0.4, [], BACK));
+    for (let st = 0; st < 3; st++) {
+      boxes.push(B(-4.5 + st * 1.6, 0, s * 28.6, 0.12, 1.6, 2.2, 0xd8d2c8, 'metal'));
+      boxes.push(B(5 + st * 1.6, 0, s * 28.6, 0.12, 1.6, 2.2, 0xd8d2c8, 'metal'));
+    }
+    boxes.push(B(-1.5, 0, s * 25.5, 3.2, 0.85, 0.6, 0xe8e8ee, 'tile'));
+    boxes.push(B(7.5, 0, s * 25.5, 3.2, 0.85, 0.6, 0xe8e8ee, 'tile'));
+    boxes.push(B(-16, 0, s * 27, 3, 1.4, 2.2, 0xc8a878, 'wood'));
+    boxes.push(B(-30, 0, s * 27, 2.4, 1.1, 2, 0xc8a878, 'wood'));
+    boxes.push(B(20, 0, s * 27, 2.6, 1.3, 2, 0xc8a878, 'wood'));
+  }
+  boxes.push(...wallZ(-24, -20, 42, 0, 4.6, 0.4, [[-23, -21]], BACK));
+  boxes.push(...wallZ(20, 24, 42, 0, 4.6, 0.4, [[21, 23]], BACK));
+  boxes.push(...wallZ(-30, -24, 42, 0, 4.6, 0.4, [], BACK));
+  boxes.push(...wallZ(24, 30, 42, 0, 4.6, 0.4, [], BACK));
+
+  for (const [cx, seg] of [[-28, 0], [-15, 1]]) {
+    for (let r = 0; r < 2; r++) {
+      boxes.push(B(cx - 2.5, 0, -17 + r * 4.5, 1.0, 1.7, 3.2, 0x7fa8d0, 'goods'));
+      boxes.push(B(cx + 2.5, 0, -17 + r * 4.5, 1.0, 1.7, 3.2, 0x7fa8d0, 'goods'));
+    }
+    boxes.push(B(cx, 0, -9.5, 3, 0.95, 1.0, 0x9c8f80, 'wood'));
+  }
+  for (const cx of [18, 29, 38]) {
+    boxes.push(B(cx - 2, 0, -16, 2.6, 1.35, 1.2, 0xd0aab8, 'metal'));
+    boxes.push(B(cx + 2, 0, -12, 2.6, 1.35, 1.2, 0xb8c8d8, 'metal'));
+    boxes.push(B(cx, 0, -9.3, 2.6, 0.95, 1.0, 0x9c8f80, 'wood'));
+  }
+  for (const cx of [-28, -15]) {
+    boxes.push(B(cx, 0, 13, 5.5, 1.5, 0.9, 0x8a7f72, 'goods'));
+    boxes.push(B(cx, 0, 17, 5.5, 1.5, 0.9, 0x8a7f72, 'goods'));
+  }
+  for (const [tx, tz] of [[16, 13], [20, 16], [16, 18], [30, 13], [37, 16], [30, 18]]) {
+    boxes.push(B(tx, 0, tz, 1.4, 0.75, 1.4, 0xc9a06a, 'wood'));
   }
 
-  // ============ 案内所 (牢屋) = 東側コンコースに面した開放カウンター ============
-  // コンコース(z -8..8)の東寄りに、柵で3方を囲みコート側(西)を開口
-  boxes.push(...wallX(28, 33, -2.4, 0, 1.1, 0.22, [], 0xc8ccd4, 'rail'));
-  boxes.push(...wallX(28, 33, 2.4, 0, 1.1, 0.22, [], 0xc8ccd4, 'rail'));
-  boxes.push(...wallZ(-2.4, 2.4, 33, 0, 1.1, 0.22, [], 0xc8ccd4, 'rail'));
-  boxes.push(B(32.0, 0, 0, 1.8, 0.95, 0.6, 0x9c8f80, 'wood'));           // 受付カウンター(東奥)
-  boxes.push(B(32.6, 1.0, 0, 0.6, 1.4, 2.6, 0x707a90, 'metal', { deco: 1 })); // 案内板
-  boxes.push(B(30.4, 2.3, 0, 4.0, 0.8, 0.3, 0xff5555, 'sign', { deco: 1, glow: 1 }));
+  boxes.push(...wallZ(-20, 20, 42, 0, 4.6, 0.5, [[-7, 7]], WALL));
+  boxes.push(B(54.6, 0, -14, 1.6, 1.05, 9, 0x9c8f80, 'wood'));
+  boxes.push(B(54.6, 0, 2, 1.6, 1.05, 9, 0x9c8f80, 'wood'));
+  boxes.push(B(54.6, 0, 16, 1.6, 1.05, 8, 0x9c8f80, 'wood'));
+  boxes.push(B(54.8, 3.2, -14, 0.3, 1.0, 8, 0xff6b47, 'sign', { deco: 1, glow: 1 }));
+  boxes.push(B(54.8, 3.2, 2, 0.3, 1.0, 8, 0xffd166, 'sign', { deco: 1, glow: 1 }));
+  boxes.push(B(54.8, 3.2, 16, 0.3, 1.0, 7, 0x8ce99a, 'sign', { deco: 1, glow: 1 }));
+  for (const [tx, tz] of [[46, -16], [50, -12], [46, -7], [51, -3], [46, 2], [50, 7], [46, 12], [50, 17], [46, 21]]) {
+    boxes.push(B(tx, 0, tz, 1.6, 0.78, 1.6, 0xc9a06a, 'wood'));
+    boxes.push(B(tx + 1.3, 0, tz, 0.5, 0.48, 0.5, 0x8a6a44, 'wood'), B(tx - 1.3, 0, tz, 0.5, 0.48, 0.5, 0x8a6a44, 'wood'));
+  }
+  boxes.push(B(50, 0, 26, 2.2, 0.45, 2.2, 0x66ddff, 'metal', { bounce: 1, glow: 1 }));
+  boxes.push(B(45, 0, 26.5, 1.2, 0.6, 1.2, 0xff8fb3, 'metal'), B(46.8, 0, 27.5, 1.0, 0.9, 1.0, 0x8ce99a, 'metal'));
+  boxes.push(B(47, 0, -27.5, 6, 1.9, 1.1, 0xdd4444, 'vend'));
 
-  // ============ ガーデンコート (Southdaleの象徴・2層吹抜け) ============
-  // 巨大鳥かご (高さ約14ft x3の名物アビアリー)
-  boxes.push(B(0, 0, -2, 3.4, 0.5, 3.4, 0xdfe8ee, 'tile'));
-  for (const [px, pz] of [[-1.4, -3.4], [1.4, -3.4], [-1.4, -0.6], [1.4, -0.6]]) {
-    boxes.push(B(px, 0.5, pz, 0.16, 9, 0.16, 0xd8b24a, 'metal'));
-  }
-  boxes.push(B(0, 9.5, -2, 3.7, 0.4, 3.7, 0xd8b24a, 'metal', { deco: 1 }));
-  boxes.push(B(0, 10, -2, 0.9, 0.9, 0.9, 0xd8b24a, 'metal', { deco: 1 }));
-  boxes.push(B(0, 2, -3.35, 3.2, 7, 0.06, 0xe8d9a8, 'rail', { deco: 1 }));
-  boxes.push(B(0, 2, -0.65, 3.2, 7, 0.06, 0xe8d9a8, 'rail', { deco: 1 }));
-  boxes.push(B(-1.35, 2, -2, 0.06, 7, 2.6, 0xe8d9a8, 'rail', { deco: 1 }));
-  boxes.push(B(1.35, 2, -2, 0.06, 7, 2.6, 0xe8d9a8, 'rail', { deco: 1 }));
-  for (const [bx, by, bz, bc] of [[-0.6, 2.4, -2.4, 0xff6b81], [0.5, 3.6, -1.6, 0x54c2ff], [0.1, 5.2, -2.2, 0xffd166]]) {
-    boxes.push(B(bx, by, bz, 0.3, 0.25, 0.3, bc, 'sign', { deco: 1, glow: 1 }));
-  }
-  // 泉と池 (Garden Court of Perpetual Spring)
-  boxes.push(B(6.5, 0, 4.5, 6.5, 0.55, 4.5, 0xdfe8ee, 'tile'));
-  boxes.push(B(6.5, 0.55, 4.5, 5.4, 0.2, 3.4, 0x58b8e8, 'water', { deco: 1, glow: 1 }));
-  boxes.push(B(6.5, 0.55, 4.5, 0.8, 2.4, 0.8, 0xdfe8ee, 'tile'));
-  boxes.push(B(6.5, 3.0, 4.5, 0.4, 1.2, 0.4, 0x9fdcf8, 'crystal', { deco: 1, glow: 1 }));
-  // サイドウォークカフェ
-  boxes.push(B(-8.9, 0, -5, 1.0, 1.0, 3.2, 0x8a6a44, 'wood'));
-  for (const [tx, tz] of [[-6.2, -6.3], [-4.4, -4.2], [-6.6, -3.2], [-4.2, -6.6]]) {
-    boxes.push(B(tx, 0, tz, 1.1, 0.75, 1.1, 0xc9a06a, 'wood'));
-    boxes.push(B(tx, 0.75, tz, 0.1, 1.4, 0.1, 0x8a6a44, 'wood', { deco: 1 }));
-    boxes.push(B(tx, 2.15, tz, 1.7, 0.12, 1.7, [0xff6b81, 0x54c2ff, 0xffd166, 0x8ce99a][((tx * 3 + tz) & 3 + 4) % 4], 'leaf', { deco: 1 }));
-  }
-  boxes.push(B(-8.9, 3.2, -5, 1.2, 0.7, 3.4, 0xffb14d, 'sign', { deco: 1, glow: 1 }));
-  // 彫刻 (モダンアート) と植栽
-  boxes.push(B(-6, 0, 4, 1.5, 0.5, 1.5, 0x9aa2ac, 'stone'));
-  boxes.push(B(-6, 0.5, 4, 0.5, 2.6, 0.5, 0xd88a3a, 'metal', { deco: 1, glow: 1 }));
-  boxes.push(B(-6.3, 2.2, 4.3, 1.3, 0.18, 0.18, 0xd88a3a, 'metal', { deco: 1 }));
-  for (const [px, pz] of [[-9, 7], [9, -7], [-9, -8.5], [9.3, 0.5]]) {
-    boxes.push(B(px, 0, pz, 1.9, 0.65, 1.9, 0x8a7a64, 'wood'));
-    boxes.push(B(px, 0.65, pz, 1.2, 1.9, 1.2, 0x3f9b4f, 'leaf', { deco: 1 }));
-  }
-  for (const [bx, bz] of [[3.5, -6.5], [-2.5, 6.5], [3.5, 7.5]]) {
-    boxes.push(B(bx, 0, bz, 2.4, 0.55, 0.8, 0xb08a5f, 'wood'));
-  }
-  // 天窓 (コート上部)
-  boxes.push(B(0, 10.55, 0, 22, 0.15, 16, 0xbfe8ff, 'glass', { deco: 1, glow: 1 }));
-  for (const lx of [-24, -15, 15, 24]) boxes.push(B(lx, 10.4, 0, 7, 0.15, 1.2, 0xfff2dd, 'sign', { deco: 1, glow: 1 }));
+  boxes.push(...stairs(-5.5, 0, -11, 'e', 2.2, 20, 0.25, 0.5, 0x99a0aa, 'metal'));
+  boxes.push(...stairs(9.5, 0, 11, 'w', 2.2, 20, 0.25, 0.5, 0x99a0aa, 'metal'));
+  boxes.push(...stairs(44, 0, -14, 'e', 2.4, 20, 0.25, 0.5, 0x99a0aa, 'metal'));
+  boxes.push(...stairs(-38, 0, -27, 'w', 2.4, 20, 0.25, 0.5, BACK));
 
-  // ============ コートの大階段 ×2 (2層を結ぶ) ============
-  boxes.push(...stairs(-24.3, 0, -8.6, 'e', 2.4, 20, 0.25, 0.5, 0x99a0aa, 'metal'));
-  boxes.push(...stairs(24.3, 0, 8.6, 'w', 2.4, 20, 0.25, 0.5, 0x99a0aa, 'metal'));
-
-  // ============ 2F 回廊スラブ (吹抜け・階段孔を除く) ============
   const slab = (x1, x2, z1, z2) => boxes.push(B((x1 + x2) / 2, F2 - 0.4, (z1 + z2) / 2, x2 - x1, 0.4, z2 - z1, F2C, 'tile'));
-  slab(-34, 34, -22, -9.8);
-  slab(-34, -19.5, -9.8, -8); slab(-14.2, 34, -9.8, -8);
-  slab(-34, -11, -8, 7.4); slab(11, 34, -8, 7.4);
-  slab(-34, -11, 7.4, 8); slab(11, 14.2, 7.4, 8); slab(19.5, 34, 7.4, 8);
-  slab(-34, 14.2, 8, 9.8); slab(19.5, 34, 8, 9.8);
-  slab(-34, 34, 9.8, 22);
+  slab(-56, -48.4, -30, 30);
+  slab(-48.4, -37.6, -30, -28.2);
+  slab(-48.4, -37.6, -25.8, 30);
+  slab(-37.6, -34, -30, 30);
+  slab(-34, 43.4, -30, -12.2);
+  slab(-34, -6.2, -12.2, -9.8); slab(4.7, 43.4, -12.2, -9.8);
+  slab(-34, 43.4, -9.8, -8);
+  slab(-34, -6, -8, -1.5); slab(10, 43.4, -8, -1.5);
+  slab(-34, 43.4, -1.5, 1.5);
+  slab(-34, -6, 1.5, 8); slab(10, 43.4, 1.5, 8);
+  slab(-34, 43.4, 8, 9.8);
+  slab(-34, -0.7, 9.8, 12.2); slab(10.2, 43.4, 9.8, 12.2);
+  slab(-34, 43.4, 12.2, 30);
+  slab(43.4, 56, -30, -15.2);
+  slab(54.2, 56, -15.2, -12.8);
+  slab(43.4, 56, -12.8, -8);
+  slab(43.4, 44, -8, 8); slab(54, 56, -8, 8);
+  slab(43.4, 56, 8, 30);
 
-  // 吹抜けまわりの手すり
   const RAIL = 0xc8ccd4;
-  boxes.push(...wallX(-11, 11, -8.15, F2, 1.0, 0.22, [], RAIL, 'rail'));
-  boxes.push(...wallX(-11, 11, 8.15, F2, 1.0, 0.22, [], RAIL, 'rail'));
-  boxes.push(...wallZ(-8, 8, -11.15, F2, 1.0, 0.22, [], RAIL, 'rail'));
-  boxes.push(...wallZ(-8, 8, 11.15, F2, 1.0, 0.22, [], RAIL, 'rail'));
-  boxes.push(...wallX(-19.5, -14.2, -7.35, F2, 1.0, 0.22, [], RAIL, 'rail'));
-  boxes.push(...wallX(14.2, 19.5, 7.35, F2, 1.0, 0.22, [], RAIL, 'rail'));
+  boxes.push(...wallZ(-8, -1.5, -6, F2, 1.0, 0.22, [], RAIL, 'rail'), ...wallZ(1.5, 8, -6, F2, 1.0, 0.22, [], RAIL, 'rail'));
+  boxes.push(...wallZ(-8, -1.5, 10, F2, 1.0, 0.22, [], RAIL, 'rail'), ...wallZ(1.5, 8, 10, F2, 1.0, 0.22, [], RAIL, 'rail'));
+  boxes.push(...wallX(-6, 10, -8, F2, 1.0, 0.22, [[-6, -5.2], [3.5, 5.2]], RAIL, 'rail'));
+  boxes.push(...wallX(-6, 10, 8, F2, 1.0, 0.22, [[-1.2, 0.6], [9.2, 10]], RAIL, 'rail'));
+  boxes.push(...wallX(-6, 10, -1.5, F2, 1.0, 0.22, [], RAIL, 'rail'), ...wallX(-6, 10, 1.5, F2, 1.0, 0.22, [], RAIL, 'rail'));
+  boxes.push(...wallX(44, 54, -8, F2, 1.0, 0.22, [], RAIL, 'rail'), ...wallX(44, 54, 8, F2, 1.0, 0.22, [], RAIL, 'rail'));
+  boxes.push(...wallZ(-8, 8, 44, F2, 1.0, 0.22, [], RAIL, 'rail'), ...wallZ(-8, 8, 54, F2, 1.0, 0.22, [[-14.8, -13]], RAIL, 'rail'));
 
-  // 2F 回廊のベンチ・植栽
-  for (const [bx, bz] of [[-16, -14], [16, 14], [0, -14], [0, 14]]) {
-    boxes.push(B(bx, F2, bz, 2.4, 0.55, 0.8, 0xb08a5f, 'wood'));
+  boxes.push(...wallZ(-30, 30, -34, F2, 4, 0.5, [[-23, -21], [-18, -13], [-3, 3], [13, 18], [21, 23]], WALL));
+  for (let r = 0; r < 4; r++) {
+    boxes.push(B(-49, F2, -15 + r * 8, 6, 1.4, 1.0, 0xd0aab8, 'metal'));
+    boxes.push(B(-40, F2, -15 + r * 8, 6, 1.4, 1.0, 0xb8c8d8, 'metal'));
   }
-  for (const [px, pz] of [[-28, 14], [28, -14]]) {
-    boxes.push(B(px, F2, pz, 1.4, 0.6, 1.4, 0x8a7a64, 'wood'));
-    boxes.push(B(px, F2 + 0.6, pz, 0.9, 1.3, 0.9, 0x3f9b4f, 'leaf', { deco: 1 }));
+  boxes.push(B(-52, F2, 24, 5, 2.1, 4, 0xcfc8bc, 'shelf'));
+  boxes.push(B(-45, F2 + 4.6, -34, 14, 1.2, 0.3, 0xc42a76, 'sign', { deco: 1, glow: 1 }));
+  for (const s of [-1, 1]) {
+    const front = s * 7, back = s * 20, band = s * 24;
+    boxes.push(...wallX(-34, -8, front, F2, 4, 0.5, [[-30, -26], [-16, -12]], SHOP));
+    boxes.push(...wallX(12, 42, front, F2, 4, 0.5, [[14, 17], [25, 28], [36, 39]], SHOP));
+    boxes.push(...wallX(-34, 42, back, F2, 4, 0.4, [[-0.8, 0.8], [-22, -20.5], [30, 31.5]], BACK));
+    boxes.push(...wallX(-8, 12, s * 16, F2, 4, 0.5, [[0, 6]], SHOP));
+    boxes.push(...wallX(-34, 42, band, F2, 4, 0.4, [[0.5, 2.5], [3.5, 5.5]], BACK));
+    boxes.push(...wallZ(Math.min(tzz(s, 24), tzz(s, 30)), Math.max(tzz(s, 24), tzz(s, 30)), -6, F2, 4, 0.4, [], BACK));
+    boxes.push(...wallZ(Math.min(tzz(s, 24), tzz(s, 30)), Math.max(tzz(s, 24), tzz(s, 30)), 12, F2, 4, 0.4, [], BACK));
+    for (let st = 0; st < 3; st++) boxes.push(B(-4.5 + st * 1.6, F2, s * 28.6, 0.12, 1.6, 2.2, 0xd8d2c8, 'metal'));
+    boxes.push(B(-1.5, F2, s * 25.5, 3.2, 0.85, 0.6, 0xe8e8ee, 'tile'));
   }
+  for (let r = 0; r < 3; r++) {
+    boxes.push(B(-28, F2, -17.5 + r * 3.6, 8, 2.1, 0.9, 0x8a6a44, 'books'));
+    boxes.push(B(-15, F2, -17.5 + r * 3.6, 8, 2.1, 0.9, 0x8a6a44, 'books'));
+  }
+  boxes.push(B(-21, F2 + 4.6, -7, 10, 1.0, 0.3, 0x2a9d5c, 'sign', { deco: 1, glow: 1 }));
+  for (const cx of [18, 30, 38]) {
+    boxes.push(B(cx, F2, -15, 3, 1.35, 1.1, 0xb8c8d8, 'metal'));
+    boxes.push(B(cx, F2, -10.5, 3, 0.95, 1.0, 0x9c8f80, 'wood'));
+  }
+  const gameCols = [0xff5f7a, 0x54c2ff, 0xffd166, 0x9b8cff, 0x66e0aa];
+  let gi = 0;
+  for (const gx of [-30, -25, -20, -15, -10]) {
+    boxes.push(B(gx, F2, 11.5, 1.7, 1.75, 1.7, gameCols[gi % 5], 'arcade', { glow: 1 }));
+    boxes.push(B(gx, F2, 17.5, 1.7, 1.75, 1.7, gameCols[(gi + 2) % 5], 'arcade', { glow: 1 }));
+    gi++;
+  }
+  boxes.push(B(-21, F2 + 4.6, 7, 12, 1.1, 0.3, 0xffb14d, 'sign', { deco: 1, glow: 1 }));
+  for (const [x1, x2] of [[12, 22], [23, 32], [33, 42]]) {
+    const cx = (x1 + x2) / 2;
+    boxes.push(B(cx - 2, F2, 12, 1.4, 0.78, 1.4, 0xc9a06a, 'wood'));
+    boxes.push(B(cx + 2, F2, 16, 1.4, 0.78, 1.4, 0xc9a06a, 'wood'));
+    boxes.push(B(cx, F2, 19, 2.6, 0.95, 0.9, 0x9c8f80, 'wood'));
+    boxes.push(B(cx, F2 + 4.6, 7, (x2 - x1) - 2, 1.0, 0.3, shopColors[(cx | 0) % 6], 'sign', { deco: 1, glow: 1 }));
+  }
+  boxes.push(B(49, F2, -20, 2.6, 0.55, 1.1, 0xb08a5f, 'wood'), B(49, F2, 20, 2.6, 0.55, 1.1, 0xb08a5f, 'wood'));
+  boxes.push(B(45, F2, -24, 1.4, 0.7, 1.4, 0x8a7a64, 'wood'));
+  boxes.push(B(45, F2 + 0.7, -24, 0.9, 1.3, 0.9, 0x3f9b4f, 'leaf', { deco: 1 }));
 
-  // 案内サイン・ゴミ箱などの小物
-  for (const sx of [-22, 22]) {
-    boxes.push(B(sx, 3.9, 0, 2.6, 0.7, 0.12, 0xf8f8f4, 'sign', { deco: 1, glow: 1 }));
-    boxes.push(B(sx, 4.6, 0, 0.08, 0.35, 0.08, 0x9aa2ac, 'metal', { deco: 1 }));
+  for (const sx of [-30, -10, 14, 32]) {
+    boxes.push(B(sx, 4.1, 0, 2.6, 0.7, 0.12, 0xf8f8f4, 'sign', { deco: 1, glow: 1 }));
+    boxes.push(B(sx, 4.8, 0, 0.08, 0.35, 0.08, 0x9aa2ac, 'metal', { deco: 1 }));
   }
-  boxes.push(B(-13, 0, 8.5, 0.25, 1.7, 1.1, 0x2a3856, 'sign', { deco: 1, glow: 1 }));
-  for (let i = 0; i < 3; i++) boxes.push(B(-12.6, 0, -7 + i * 1.1, 0.6, 1.3, 0.6, shopColors[i], 'metal', { deco: 1, glow: 1 }));
+  boxes.push(B(-3.5, 0, 4.5, 0.25, 1.7, 1.1, 0x2a3856, 'sign', { deco: 1, glow: 1 }));
+  const gachaCols = [0xff6b81, 0x54c2ff, 0xffd166, 0x8ce99a];
+  for (let i = 0; i < 4; i++) boxes.push(B(-7.4, 0, -9.5 + i * 1.1, 0.6, 1.3, 0.6, gachaCols[i], 'metal', { deco: 1, glow: 1 }));
+  boxes.push(B(-33.4, 0, -5.4, 0.7, 1.7, 0.9, 0x3a6fd8, 'metal', { deco: 1, glow: 1 }));
+  boxes.push(B(-33.4, 0, -4.1, 0.7, 1.7, 0.9, 0xd83a5e, 'metal', { deco: 1, glow: 1 }));
+  for (const [px, pz] of [[-14, -5.8], [-24, 5.8], [30, -5.8], [40, 5.8]]) {
+    boxes.push(B(px, 0, pz, 1.2, 0.55, 1.2, 0x8a7a64, 'wood', { deco: 1 }));
+    boxes.push(B(px, 0.55, pz, 0.8, 1.2, 0.8, 0x3f9b4f, 'leaf', { deco: 1 }));
+  }
+  boxes.push(B(2, 0.9, 0, 0.35, 1.7, 0.35, 0x9fdcf8, 'crystal', { deco: 1, glow: 1 }));
+  boxes.push(B(2, 2.4, 0, 0.7, 0.25, 0.7, 0x9fdcf8, 'crystal', { deco: 1, glow: 1 }));
+  for (let i = 0; i < 3; i++) boxes.push(B(-34.9, 0, -20.2 + i * 0.8, 0.8, 1.0, 0.7, 0xb8c4d0, 'metal', { deco: 1 }));
+  for (const bx of [-4, 2, 8]) boxes.push(B(bx, 10.6, 0, 0.4, 0.3, 30, 0xd8dde4, 'metal', { deco: 1 }));
+  for (const s of [-1, 1]) {
+    boxes.push(B(1.5, 4.0, s * 15.6, 0.9, 0.6, 0.15, 0x3aa0e8, 'sign', { deco: 1, glow: 1 }));
+    boxes.push(B(4.5, 4.0, s * 15.6, 0.9, 0.6, 0.15, 0xe86a8a, 'sign', { deco: 1, glow: 1 }));
+  }
+  boxes.push(B(44.8, 0, -3.5, 1.2, 1.0, 0.8, 0x9c8f80, 'wood', { deco: 1 }));
+
+  boxes.push(B(35, 0, -26, 3.5, 0.9, 1.0, 0x707a90, 'metal'));
+  boxes.push(B(38.5, 0, -28.5, 2.2, 1.6, 1.2, 0x8a94a8, 'metal'));
+  boxes.push(B(35, 4.7, -24, 6, 1.0, 0.3, 0xff5555, 'sign', { deco: 1, glow: 1 }));
 
   return {
     id: 'mall', name: 'ショッピングモール', boxes,
     sky: 0x252a34, fog: { color: 0x2a303c, near: 34, far: 140 },
     ambient: 0.78, sun: 0.62, sunColor: 0xfff2dd,
     lights: [
-      { x: 0, y: 8, z: 0, c: 0xffeecc, i: 34, d: 34 }, { x: -45, y: 7, z: 0, c: 0xffeecc, i: 24, d: 28 },
-      { x: 45, y: 7, z: 0, c: 0xffeecc, i: 24, d: 28 }, { x: -22, y: 7, z: 0, c: 0xffeecc, i: 18, d: 22 },
-      { x: 22, y: 7, z: 0, c: 0xffeecc, i: 18, d: 22 }
+      { x: 2, y: 8, z: 0, c: 0xffeecc, i: 34, d: 34 }, { x: -45, y: 7, z: 0, c: 0xffeecc, i: 24, d: 28 },
+      { x: 49, y: 8, z: 0, c: 0xffeecc, i: 26, d: 28 }, { x: -20, y: 7, z: 0, c: 0xffeecc, i: 18, d: 22 },
+      { x: 26, y: 7, z: 0, c: 0xffeecc, i: 18, d: 22 }
     ],
     bounds: { minX: -55, maxX: 55, minZ: -29, maxZ: 29 },
-    jail: { x: 29.8, y: 0, z: 0, w: 2.6, d: 3.4 },
+    jail: { x: 35.5, y: 0, z: -27, w: 6, d: 3.5 },
     spawns: {
-      oni: [[-3, 0.1, 1], [-1, 0.1, 4], [3, 0.1, -0.5], [0, 0.1, 6.5], [-4, 0.1, -2], [3, 0.1, 1.5], [-1, 0.1, -5], [-6, 0.1, 0.5]],
+      oni: [[2, 0.1, -4.5], [5.5, 0.1, 0], [-1.5, 0.1, 0], [2, 0.1, 4.5], [5.5, 0.1, 4.5], [-1.5, 0.1, -4.5], [5.5, 0.1, -4.5], [-1.5, 0.1, 4.5]],
       run: [
-        [-45, 0.1, 0], [-50, 0.1, -14], [45, 0.1, 10], [50, 0.1, -5], [-20, 0.1, 0], [20, 0.1, 0],
-        [0, 0.1, 25.5], [-20, 0.1, -25.5], [-45, 5.1, 12], [45, 5.1, -12], [-25, 5.1, 15], [25, 5.1, -15]
+        [-45, 0.1, 0], [-50, 0.1, -20], [-51, 0.1, -28], [50, 0.1, 12], [48, 0.1, -20],
+        [-28, 0.1, -13], [18, 0.1, -13], [-28, 0.1, 15], [18, 0.1, 13],
+        [-20, 5.1, -13], [-20, 5.1, 13], [30, 5.1, 13]
       ]
     }
   };
 }
+function tzz(s, v) { return s * v; }
 
 // ============================================================
-// 学校 = 文部省「鉄筋コンクリート造校舎の標準設計」(1950) 準拠
-//   (日本建築学会作成・全国のRC校舎の原型)
-//   - 普通教室 7m(奥行)×9m(間口) を一列に6室
-//   - 北側片廊下 幅2.7m / 教室は南面採光
-//   - 両端に階段室 / 3階建 / 中央昇降口
-//   - 別棟の体育館・プール・校庭 (校門/朝礼台/鉄棒/砂場)
 // ============================================================
 function buildSchool() {
   const WALL = 0xe6ddca, CORR = 0xcabfa8, CLS = 0xd8ceba, GYMC = 0xc8b494, SLAB = 0xb8ad96, FENCE = 0x8a9aa8;
   const boxes = [];
-  const FH = 3.8, FLOORS = 3, ROOF = FH * FLOORS; // 階高3.8m・3階建
+  const FH = 4.2;
+  const FLOORS = 4;
+  const ROOF = FH * FLOORS;
   boxes.push(B(0, -0.5, 0, 106, 0.5, 82, 0xb99a6b, 'dirt'));
-  boxes.push(...wallX(-52, 52, -39.7, 0, 2.2, 0.5, [], FENCE, 'fence'), ...wallX(-52, 52, 39.7, 0, 2.2, 0.5, [[-3, 3]], FENCE, 'fence'));
+  boxes.push(...wallX(-52, 52, -39.7, 0, 2.2, 0.5, [], FENCE, 'fence'), ...wallX(-52, 52, 39.7, 0, 2.2, 0.5, [], FENCE, 'fence'));
   boxes.push(...wallZ(-40, 40, -51.7, 0, 2.2, 0.5, [], FENCE, 'fence'), ...wallZ(-40, 40, 51.7, 0, 2.2, 0.5, [], FENCE, 'fence'));
 
-  // ---- 校舎: 北壁z=-38 / 廊下2.7m / 間仕切りz=-34.85 / 南壁z=-27.5 ----
-  // 教室グリッド x: -27,-18,-9,0,9,18,27 (9m間口×6) / 両端階段室4.5m
-  const ROOMS = [[-27, -18], [-18, -9], [-9, 0], [0, 9], [9, 18], [18, 27]];
-  const LANE_A = 30.2, LANE_B = 28.1; // 階段2レーン (|x|, 東西対称)
 
-  for (let fl = 0; fl < FLOORS; fl++) {
-    const Y = fl * FH, is1F = fl === 0;
-    // 外壁
-    boxes.push(...wallX(-31.5, 31.5, -38, Y, FH, 0.5, [], WALL));
-    boxes.push(...wallX(-31.5, 31.5, -27.5, Y, FH, 0.5,
-      is1F ? [[-2.5, 2.5], [-30.7, -28.6], [28.6, 30.7]] : [], WALL));
-    boxes.push(...wallZ(-38, -27.5, -31.5, Y, FH, 0.5, [], WALL));
-    boxes.push(...wallZ(-38, -27.5, 31.5, Y, FH, 0.5, [], WALL));
-    // 廊下と教室の間仕切り (各教室に引き戸2箇所 / 中央は昇降口ホール)
-    const gaps = [];
-    for (const [x1, x2] of ROOMS) {
-      if (is1F && (x1 === -9 || x1 === 0)) continue;
-      gaps.push([x1 + 0.7, x1 + 2.5], [x2 - 2.5, x2 - 0.7]);
-    }
-    if (is1F) gaps.push([-3, 3]);
-    boxes.push(...wallX(-27, 27, -34.85, Y, FH, 0.4, gaps, CLS));
-    // 階段室との仕切り (廊下部分だけ通り抜け)
-    boxes.push(...wallZ(-38, -27.5, -27, Y, FH, 0.4, [[-37.75, -35.05]], CLS));
-    boxes.push(...wallZ(-38, -27.5, 27, Y, FH, 0.4, [[-37.75, -35.05]], CLS));
-    // 教室間の間仕切り
-    const divs = (is1F) ? [-18, -9, 9, 18] : [-18, -9, 0, 9, 18];
-    for (const dx of divs) boxes.push(...wallZ(-34.65, -27.5, dx, Y, FH, 0.3, [], CLS));
+  boxes.push(B(0, 0, -31, 68, 0.12, 14, 0x9aa4ae, 'tile'));
+  boxes.push(B(-27, 0, -8, 14, 0.12, 32, 0x9aa4ae, 'tile'));
+  boxes.push(B(27, 0, -8, 14, 0.12, 32, 0x9aa4ae, 'tile'));
 
-    // ---- 各階の室内 ----
-    if (is1F) {
-      // 昇降口ホール (下駄箱) x -9..9
-      for (const gx of [-6.5, -3.5, 3.5, 6.5]) boxes.push(B(gx, Y, -33.5, 2.4, 1.5, 0.8, 0x9a8a74, 'locker'));
-      boxes.push(B(0, Y, -33.8, 2.2, 0.5, 1.6, 0xc9a878, 'wood'));
-      // 理科室 [-27,-18]
-      for (const tz of [-33.4, -30.6]) {
-        boxes.push(B(-24.5, Y, tz, 3.4, 0.85, 1.2, 0x2a2a30, 'wood'));
-        boxes.push(B(-20.5, Y, tz, 3.4, 0.85, 1.2, 0x2a2a30, 'wood'));
-      }
-      // 保健室 [-18,-9]
-      boxes.push(B(-15.5, Y, -33.8, 2.0, 0.6, 3.6, 0xe8e8f0, 'tile'));
-      boxes.push(B(-12.5, Y, -33.8, 2.0, 0.6, 3.6, 0xe8e8f0, 'tile'));
-      boxes.push(B(-16.4, Y, -29.5, 1.5, 0.75, 1.0, 0xc9a878, 'wood'));
-      // 職員室 [9,18]
-      for (const [dx, dz] of [[11.5, -33.5], [15.5, -33.5], [11.5, -31], [15.5, -31]])
-        boxes.push(B(dx, Y, dz, 3.0, 0.75, 1.1, 0xc9a878, 'wood'));
-      boxes.push(B(13.5, Y + 3.0, -27.7, 5, 0.7, 0.3, 0x2a9d5c, 'sign', { deco: 1, glow: 1 }));
-      // 図書室 [18,27]
-      for (const sz of [-34.2, -32, -29.8]) boxes.push(B(22.5, Y, sz, 7, 1.9, 0.8, 0x8a6a44, 'books'));
-    } else {
-      // 2F/3F: 普通教室 ×6 (机2列×3・教壇・教卓)
-      for (const [x1, x2] of ROOMS) {
-        const cx = (x1 + x2) / 2;
-        for (const [dx, dz] of [[-1.8, -33.6], [1.8, -33.6], [-1.8, -31.9], [1.8, -31.9], [-1.8, -30.2], [1.8, -30.2]])
-          boxes.push(B(cx + dx, Y, dz, 1.0, 0.72, 0.7, 0xc9a878, 'wood'));
-        boxes.push(B(cx, Y, -36.5, 2.6, 0.18, 1.3, 0xb08a54, 'wood'));      // 教壇
-        boxes.push(B(cx + 1.6, Y + 0.18, -36.5, 1.4, 0.68, 0.8, 0x8a6a44, 'wood')); // 教卓
-        boxes.push(B(cx, Y + 1.0, -37.6, 4.2, 1.15, 0.12, 0x2a5a44, 'board', { deco: 1 })); // 黒板
-      }
-    }
-    // 廊下の掲示物・消火器
-    boxes.push(B(-19.5, Y, -37.55, 0.22, 0.55, 0.22, 0xdd3333, 'metal', { deco: 1 }));
-    boxes.push(B(19.5, Y, -37.55, 0.22, 0.55, 0.22, 0xdd3333, 'metal', { deco: 1 }));
-    boxes.push(B(-6, Y + 1.2, -37.7, 3, 1.2, 0.1, 0x7a9a6a, 'poster', { deco: 1 }));
-    boxes.push(B(6, Y + 1.2, -37.7, 3, 1.2, 0.1, 0xc9b98a, 'poster', { deco: 1 }));
-
-    // ---- 両端の階段室 (階ごとにレーンを交互に折り返す) ----
-    for (const s of [-1, 1]) {
-      if (fl % 2 === 0) boxes.push(...stairs(s * LANE_A, Y, -31.8, 'n', 2.0, 14, FH / 14, 0.42, CORR));
-      else boxes.push(...stairs(s * LANE_B, Y, -33.8, 's', 2.0, 14, FH / 14, 0.42, CORR));
+  const stepH = FH / 14, stepD = 0.42;
+  for (const s of [-1, 1]) {
+    const laneA = s * 29.9, laneB = s * 27.7;
+    for (let fl = 0; fl < FLOORS; fl++) {
+      const Y = fl * FH;
+      if (fl % 2 === 0) boxes.push(...stairs(laneA, Y, -29.4, 'n', 2.2, 14, stepH, stepD, CORR));
+      else boxes.push(...stairs(laneB, Y, -35.5, 's', 2.2, 14, stepH, stepD, CORR));
     }
   }
 
-  // ---- 床スラブ (2F/3F/屋上) 階段孔つき ----
   for (let fl = 1; fl <= FLOORS; fl++) {
     const Y = fl * FH, isRoof = fl === FLOORS;
     const c = isRoof ? 0xb0b8c0 : SLAB;
-    boxes.push(B(0, Y - 0.35, -32.75, 54, 0.35, 11, c, 'tile')); // 中央部 x -27..27
+    const holeLaneA = fl % 2 === 1;
+    boxes.push(B(0, Y - 0.35, -33, 44, 0.35, 10, c, 'tile'));
+    boxes.push(B(0, Y - 0.35, -26, 68, 0.35, 4, c, 'tile'));
+    boxes.push(B(-27, Y - 0.35, -8, 14, 0.35, 32, c, 'tile'));
+    boxes.push(B(27, Y - 0.35, -8, 14, 0.35, 32, c, 'tile'));
     for (const s of [-1, 1]) {
-      // 階段室部分 x 27..31.75
-      const hx1 = s < 0 ? -31.25 : 29.2, hx2 = s < 0 ? -29.2 : 31.25;   // laneA範囲
-      const bx1 = s < 0 ? -29.0 : 27.0, bx2 = s < 0 ? -27.0 : 29.0;     // laneB範囲
-      if (fl % 2 === 1) {
-        // 北側laneAに孔 (下階の上り階段が到着)
-        boxes.push(B((bx1 + bx2) / 2, Y - 0.35, -32.75, bx2 - bx1, 0.35, 11, c, 'tile'));
-        boxes.push(B((hx1 + hx2) / 2, Y - 0.35, -30.6, hx2 - hx1, 0.35, 6.7, c, 'tile'));
-        boxes.push(B(s * 31.5, Y - 0.35, -32.75, 0.55, 0.35, 11, c, 'tile'));
-      } else {
-        // 南側laneBに孔
-        boxes.push(B((hx1 + hx2) / 2, Y - 0.35, -32.75, hx2 - hx1, 0.35, 11, c, 'tile'));
-        boxes.push(B((bx1 + bx2) / 2, Y - 0.35, -35.05, bx2 - bx1, 0.35, 6.4, c, 'tile'));
-        boxes.push(B(s * 31.5, Y - 0.35, -32.75, 0.55, 0.35, 11, c, 'tile'));
-      }
+      boxes.push(B(s * 28, Y - 0.35, -36.8, 12, 0.35, 2.4, c, 'tile'));
+      boxes.push(B(s * 28, Y - 0.35, -28.75, 12, 0.35, 1.5, c, 'tile'));
+      boxes.push(B(s * 32.5, Y - 0.35, -32.55, 3, 0.35, 6.1, c, 'tile'));
+      boxes.push(B(s * 24.3, Y - 0.35, -32.55, 4.6, 0.35, 6.1, c, 'tile'));
+      if (holeLaneA) boxes.push(B(s * 27.7, Y - 0.35, -32.55, 2.2, 0.35, 6.1, c, 'tile'));
+      else boxes.push(B(s * 29.9, Y - 0.35, -32.55, 2.2, 0.35, 6.1, c, 'tile'));
     }
   }
-  // 屋上フェンス・給水塔
-  boxes.push(...wallX(-31.5, 31.5, -38, ROOF, 1.1, 0.3, [], FENCE, 'fence'));
-  boxes.push(...wallX(-31.5, 31.5, -27.5, ROOF, 1.1, 0.3, [], FENCE, 'fence'));
-  boxes.push(...wallZ(-38, -27.5, -31.5, ROOF, 1.1, 0.3, [], FENCE, 'fence'));
-  boxes.push(...wallZ(-38, -27.5, 31.5, ROOF, 1.1, 0.3, [], FENCE, 'fence'));
-  boxes.push(B(10, ROOF, -33, 3, 2.4, 3, 0x98a2ac, 'metal'));
-  boxes.push(B(-10, ROOF, -34, 4.5, 0.6, 2, 0xb0b8c0, 'metal'));
 
-  // ---- 校舎の窓 (南面採光・北廊下窓) と屋上時計 ----
-  const GLASS = 0x9fc8e8;
   for (let fl = 0; fl < FLOORS; fl++) {
-    const Y = fl * FH;
-    for (let wx = -25; wx <= 25; wx += 4.5) {
-      if (fl === 0 && Math.abs(wx) < 3.5) continue;
-      boxes.push(B(wx, Y + 1.2, -27.14, 2.8, 1.6, 0.18, GLASS, 'glass', { deco: 1 }));
+    const Y = fl * FH, is1F = fl === 0;
+    boxes.push(...wallX(-34, 34, -38, Y, FH, 0.5, is1F ? [[-2, 2]] : [], WALL));
+    boxes.push(...wallZ(-38, -24, -34, Y, FH, 0.5, [], WALL));
+    boxes.push(...wallZ(-24, 8, -34, Y, FH, 0.5, [], WALL));
+    boxes.push(...wallZ(-38, -24, 34, Y, FH, 0.5, [], WALL));
+    boxes.push(...wallZ(-24, 8, 34, Y, FH, 0.5, [], WALL));
+    boxes.push(...wallX(-34, -20, 8, Y, FH, 0.5, is1F ? [[-23.5, -20.8]] : [], WALL));
+    boxes.push(...wallX(20, 34, 8, Y, FH, 0.5, is1F ? [[20.8, 23.5]] : [], WALL));
+    const doors = is1F ? [[-14, -10], [10, 14]] : [];
+    boxes.push(...wallX(-20, 20, -24, Y, 0.9, 0.5, doors, WALL));
+    boxes.push(...wallX(-20, 20, -24, Y + 1.9, FH - 1.9, 0.5, [], WALL));
+    for (const px of [-20, -10, 0, 10, 20]) boxes.push(B(px, Y + 0.9, -24, 0.7, 1.0, 0.5, WALL));
+    for (const s of [-1, 1]) {
+      const wd = is1F ? [[-16, -13], [0, 3]] : [];
+      boxes.push(...wallZ(-24, 8, s * 20, Y, 0.9, 0.5, wd, WALL));
+      boxes.push(...wallZ(-24, 8, s * 20, Y + 1.9, FH - 1.9, 0.5, [], WALL));
+      for (const pz of [-24, -16, -8, 0, 8]) boxes.push(B(s * 20, Y + 0.9, pz, 0.5, 1.0, 0.7, WALL));
     }
-    for (let wx = -28; wx <= 28; wx += 7) {
-      boxes.push(B(wx, Y + 1.4, -38.36, 3.2, 1.3, 0.18, GLASS, 'glass', { deco: 1 }));
+    const roomsX = is1F ? [[-22, -11], [-11, 0], [0, 22]] : [[-22, -11], [-11, 0], [0, 11], [11, 22]];
+    const gaps = [];
+    for (const [x1, x2] of roomsX) gaps.push([x1 + 1.5, x1 + 3.5], [x2 - 3.5, x2 - 1.5]);
+    gaps.push([-31, -29], [-25.5, -23.5], [23.5, 25.5], [29, 31]);
+    boxes.push(...wallX(-34, 34, -28, Y, FH, 0.4, gaps, CLS));
+    const divs = is1F ? [-22, -11, 0, 22] : [-22, -11, 0, 11, 22];
+    for (const dx of divs) boxes.push(...wallZ(-38, -28, dx, Y, FH, 0.4, [], CLS));
+    if (is1F) {
+      for (const sz of [-35.6, -33.2, -30.8]) {
+        boxes.push(B(5.5, Y, sz, 7, 2.0, 0.8, 0x8a6a44, 'books'));
+        boxes.push(B(15.5, Y, sz, 7, 2.0, 0.8, 0x8a6a44, 'books'));
+      }
+      boxes.push(B(4, Y, -29.3, 3.2, 0.75, 1.1, 0xc9a878, 'wood'));
+      boxes.push(B(17, Y, -29.3, 3.2, 0.75, 1.1, 0xc9a878, 'wood'));
+      boxes.push(B(10.5, Y + 3.0, -28, 6, 0.8, 0.3, 0x2a9d5c, 'sign', { deco: 1, glow: 1 }));
+      boxes.push(B(-16.5, Y, -33, 5, 0.78, 2.4, 0xc9a878, 'wood'));
+      boxes.push(B(-6, Y, -35, 2.2, 0.6, 4, 0xe8e8f0, 'tile'));
+    } else if (fl < 3) {
+      for (const [x1, x2] of roomsX) {
+        const cx = (x1 + x2) / 2;
+        for (const [dx, dz] of [[-2.5, -34.5], [0, -34.5], [2.5, -34.5], [-2.5, -31.5], [0, -31.5], [2.5, -31.5]])
+          boxes.push(B(cx + dx, Y, dz, 1.5, 0.75, 1.1, 0xc9a878, 'wood'));
+        boxes.push(B(cx, Y, -36.8, 2.0, 0.85, 0.9, 0x8a6a44, 'wood'));
+      }
+    } else {
+      for (const [x1, x2] of roomsX) boxes.push(B((x1 + x2) / 2, Y, -36.9, 5, 1.8, 0.8, 0x8a92a0, 'locker'));
+      boxes.push(B(-16.5, Y, -32, 2.6, 1.0, 1.6, 0x2a2a30, 'wood'));
+    }
+    for (const s of [-1, 1]) {
+      boxes.push(...wallZ(-24, 8, s * 24, Y, FH, 0.4, [[-22, -20], [-14, -12], [-8, -6], [-2, 0], [4, 6]], CLS));
+      boxes.push(...wallX(Math.min(s * 24, s * 34), Math.max(s * 24, s * 34), -24, Y, FH, 0.4, [], CLS));
+      boxes.push(...wallX(Math.min(s * 24, s * 34), Math.max(s * 24, s * 34), -16, Y, FH, 0.4, [], CLS));
+      boxes.push(...wallX(Math.min(s * 24, s * 34), Math.max(s * 24, s * 34), -4, Y, FH, 0.4, [], CLS));
+      for (let st = 0; st < 4; st++) boxes.push(B(s * (26 + st * 1.5), Y, -17.1, 0.12, 1.6, 1.9, 0xd8d2c8, 'metal'));
+      boxes.push(B(s * 28.5, Y, -23.3, 4, 0.85, 0.6, 0xe8e8ee, 'tile'));
+      boxes.push(B(s * 29, Y, -10, 3.2, 0.8, 1.4, 0xc9a878, 'wood'));
+      boxes.push(B(s * 29, Y, 3, 3.2, 0.8, 1.4, 0xc9a878, 'wood'));
     }
   }
-  boxes.push(B(0, ROOF - 1.9, -27.2, 1.6, 1.6, 0.15, 0xf6f6f0, 'metal', { deco: 1 }));
-  boxes.push(B(0, ROOF - 1.25, -27.15, 0.1, 0.6, 0.08, 0x22262c, 'metal', { deco: 1 }));
-  boxes.push(B(0.24, ROOF - 1.2, -27.15, 0.45, 0.1, 0.08, 0x22262c, 'metal', { deco: 1 }));
 
-  // ---- 体育館 (別棟) + 器具庫=牢屋 ----
+  boxes.push(...wallX(-34, 34, -38, ROOF, 1.1, 0.3, [], FENCE, 'fence'));
+  boxes.push(...wallX(-20, 20, -24, ROOF, 1.1, 0.3, [], FENCE, 'fence'));
+  boxes.push(...wallX(-34, -20, 8, ROOF, 1.1, 0.3, [], FENCE, 'fence'));
+  boxes.push(...wallX(20, 34, 8, ROOF, 1.1, 0.3, [], FENCE, 'fence'));
+  boxes.push(...wallZ(-38, 8, -34, ROOF, 1.1, 0.3, [], FENCE, 'fence'));
+  boxes.push(...wallZ(-38, 8, 34, ROOF, 1.1, 0.3, [], FENCE, 'fence'));
+  boxes.push(...wallZ(-24, 8, -20, ROOF, 1.1, 0.3, [], FENCE, 'fence'));
+  boxes.push(...wallZ(-24, 8, 20, ROOF, 1.1, 0.3, [], FENCE, 'fence'));
+  boxes.push(B(-12, ROOF, -34, 3.2, 2.8, 3.2, 0x98a2ac, 'metal'));
+  boxes.push(B(10, ROOF, -34, 5, 0.6, 2, 0xb0b8c0, 'metal'));
+
+  boxes.push(B(0, 0, -14, 6.5, 0.35, 4.5, 0xbfd8e8, 'tile'));
+  boxes.push(B(0, 0.35, -14, 5.2, 0.15, 3.2, 0x58b8e8, 'water', { deco: 1, glow: 1 }));
+  for (const [px, pz] of [[-12, -18], [12, -18], [-12, -4], [12, -4]]) {
+    boxes.push(B(px, 0, pz, 2.2, 0.6, 2.2, 0x8a6a44, 'wood'));
+    boxes.push(B(px, 0.6, pz, 1.4, 1.1, 1.4, 0x3f9b4f, 'leaf', { deco: 1 }));
+  }
+  for (const [tx, tz] of [[-6, 3], [6, 3]]) {
+    boxes.push(B(tx, 0, tz, 0.7, 2.6, 0.7, 0x6a4a34, 'wood'));
+    boxes.push(B(tx, 2.4, tz, 3.6, 2.6, 3.6, 0xf0a8c0, 'leaf', { deco: 1 }));
+  }
+  for (const [bx, bz] of [[-3, -19], [3, -19], [-16, -10], [16, -10]]) boxes.push(B(bx, 0, bz, 2.4, 0.5, 0.8, 0xaa8866, 'wood'));
+
   boxes.push(B(-34, 0, 24, 24, 0.12, 20, 0xd8b06a, 'wood'));
   boxes.push(...wallX(-46, -22, 14, 0, 7.5, 0.5, [[-40, -37], [-28, -25]], GYMC));
   boxes.push(...wallX(-46, -22, 34, 0, 7.5, 0.5, [], GYMC));
@@ -574,6 +631,84 @@ function buildSchool() {
   boxes.push(B(-32, 0, 30, 1.3, 1.0, 1.3, 0xcc6655, 'wood'), B(-28, 0, 18, 1.3, 1.3, 1.3, 0xcc6655, 'wood'));
   boxes.push(B(-34, 6.2, 16, 1.8, 1.2, 0.3, 0xffffff, 'metal', { deco: 1 }));
   boxes.push(B(-34, 6.2, 32, 1.8, 1.2, 0.3, 0xffffff, 'metal', { deco: 1 }));
+  boxes.push(...wallX(-27, -22, 28, 0, 3.0, 0.4, [[-26.2, -24.2]], 0x9a8a74));
+  boxes.push(...wallZ(28, 34, -27, 0, 3.0, 0.4, [], 0x9a8a74));
+  boxes.push(B(-23.5, 0, 33, 2.5, 0.9, 1.2, 0x8a7a64, 'wood'));
+
+  boxes.push(B(35, 0, 25, 22, 0.12, 18, 0xb08a54, 'wood'));
+  boxes.push(B(33, 0.12, 25, 16, 0.1, 14, 0x9fb27a, 'tatami'));
+  boxes.push(...wallX(24, 46, 16, 0, 5.5, 0.5, [[28, 31], [39, 42]], GYMC));
+  boxes.push(...wallX(24, 46, 34, 0, 5.5, 0.5, [], GYMC));
+  boxes.push(...wallZ(16, 34, 24, 0, 5.5, 0.5, [[22, 25]], GYMC));
+  boxes.push(...wallZ(16, 34, 46, 0, 5.5, 0.5, [], GYMC));
+  boxes.push(B(45.2, 3.6, 25, 0.6, 0.7, 3.2, 0x8a6a44, 'wood', { deco: 1 }));
+  boxes.push(B(43.5, 0, 30.5, 1.5, 1.7, 1.5, 0x8a4a3a, 'wood'));
+  boxes.push(B(43.5, 0, 19.5, 2.6, 1.2, 0.8, 0x8a6a44, 'wood'));
+  boxes.push(B(35, 4.6, 16, 8, 0.8, 0.3, 0x8060c0, 'sign', { deco: 1, glow: 1 }));
+
+  boxes.push(B(8, 0, 18, 4.2, 0.95, 4.2, 0xd07070, 'metal'));
+  boxes.push(B(8, 0.95, 18, 2.8, 0.95, 2.8, 0xd0a070, 'metal'));
+  boxes.push(B(8, 1.9, 18, 1.5, 0.9, 1.5, 0x70a0d0, 'metal'));
+  boxes.push(B(-4, 0, 12, 2.2, 0.45, 2.2, 0x66ddff, 'metal', { bounce: 1, glow: 1 }));
+  boxes.push(B(18, 0, 24, 2.2, 0.45, 2.2, 0x66ddff, 'metal', { bounce: 1, glow: 1 }));
+  boxes.push(B(-8, 0, 26, 2.2, 1.0, 2.2, 0xa0a8b0, 'metal'));
+  for (let i = 0; i < 3; i++) boxes.push(B(12 + i * 2.2, 0, 32, 0.15, 1.3 + i * 0.25, 0.15, 0x888888, 'metal', { deco: 1 }));
+  boxes.push(B(20, 0, 32.5, 5, 0.25, 4, 0xe0cfa0, 'dirt'));
+  boxes.push(B(-8, 0, 30.5, 16, 0.12, 5, 0x9aa4ae, 'tile'));
+  boxes.push(...wallX(-16, 0, 28, 0, 3.2, 0.4, [[-14.5, -12.8], [-9.2, -7.5], [-3.8, -2.1]], 0x9a8a74));
+  boxes.push(...wallX(-16, 0, 33, 0, 3.2, 0.4, [], 0x9a8a74));
+  boxes.push(...wallZ(28, 33, -16, 0, 3.2, 0.4, [], 0x9a8a74));
+  boxes.push(...wallZ(28, 33, 0, 0, 3.2, 0.4, [], 0x9a8a74));
+  boxes.push(...wallZ(28, 33, -10.7, 0, 3.2, 0.3, [], 0x9a8a74), ...wallZ(28, 33, -5.3, 0, 3.2, 0.3, [], 0x9a8a74));
+  boxes.push(B(-8, 3.2, 30.5, 16.4, 0.3, 5.4, 0x8a8478, 'tile'));
+  for (const cx of [-13.5, -8, -2.7]) boxes.push(B(cx, 0, 31.8, 2.2, 0.6, 0.9, 0xaa8866, 'wood'));
+  for (const [px, pz] of [[38.5, 0.8], [47.5, 0.8], [38.5, 9.2], [47.5, 9.2]]) boxes.push(B(px, 0, pz, 0.3, 2.4, 0.3, 0x98a2ac, 'metal'));
+  boxes.push(B(43, 2.4, 5, 10.5, 0.2, 10.5, 0xb0b8c0, 'metal'));
+  boxes.push(B(43, 0, 2.5, 9, 0.85, 0.5, 0x98a2ac, 'metal'));
+  boxes.push(B(43, 0, 7.5, 9, 0.85, 0.5, 0x98a2ac, 'metal'));
+  boxes.push(...wallX(42, 48, -16, 0, 3.2, 0.4, [], 0x9a8a74), ...wallX(42, 48, -8, 0, 3.2, 0.4, [], 0x9a8a74));
+  boxes.push(...wallZ(-16, -8, 48, 0, 3.2, 0.4, [], 0x9a8a74));
+  boxes.push(...wallZ(-16, -8, 42, 0, 3.2, 0.4, [[-13.5, -11]], 0x9a8a74));
+  boxes.push(B(45.5, 3.2, -12, 6.4, 0.3, 8.4, 0x8a8478, 'tile'));
+  boxes.push(B(46, 0, -14, 2.2, 1.2, 1.6, 0xc8a878, 'wood'));
+  for (const [tx, tz] of [[49, -30], [49, -22], [49, 20], [49, 30], [4, 37], [-14, 37], [26, 37], [-49, -20], [-49, 0], [-49, 10], [-42, -34], [40, -34]]) {
+    boxes.push(B(tx, 0, tz, 0.7, 2.6, 0.7, 0x6a4a34, 'wood'));
+    boxes.push(B(tx, 2.4, tz, 3.4, 2.4, 3.4, ((tx + tz) & 1) ? 0xf7c1d4 : 0xf0a8c0, 'leaf', { deco: 1 }));
+  }
+
+  const GLASS = 0x9fc8e8;
+  for (let fl = 0; fl < FLOORS; fl++) {
+    const Y = fl * FH;
+    for (let wx = -30; wx <= 30; wx += 5) {
+      if (fl === 0 && wx === 0) continue;
+      boxes.push(B(wx, Y + 1.2, -38.36, 2.6, 1.5, 0.18, GLASS, 'glass', { deco: 1 }));
+    }
+    for (let wz = -21; wz <= 5; wz += 4) {
+      boxes.push(B(-34.36, Y + 1.2, wz, 0.18, 1.5, 2.4, GLASS, 'glass', { deco: 1 }));
+      boxes.push(B(34.36, Y + 1.2, wz, 0.18, 1.5, 2.4, GLASS, 'glass', { deco: 1 }));
+    }
+    if (fl === 1 || fl === 2) {
+      for (const [x1, x2] of [[-22, -11], [-11, 0], [0, 11], [11, 22]]) {
+        boxes.push(B((x1 + x2) / 2, Y + 0.85, -37.55, 3.4, 1.15, 0.12, 0x2a5a44, 'board', { deco: 1 }));
+      }
+    }
+    boxes.push(B(-19.5, Y, -27.55, 0.22, 0.55, 0.22, 0xdd3333, 'metal', { deco: 1 }));
+    boxes.push(B(19.5, Y, -27.55, 0.22, 0.55, 0.22, 0xdd3333, 'metal', { deco: 1 }));
+    boxes.push(B(-6, Y + 1.1, -27.7, 3, 1.2, 0.1, 0x7a9a6a, 'poster', { deco: 1 }));
+    boxes.push(B(6, Y + 1.1, -27.7, 3, 1.2, 0.1, 0xc9b98a, 'poster', { deco: 1 }));
+  }
+  for (const gx of [-16.5, -7.5, 7.5, 16.5]) boxes.push(B(gx, 0, -24.6, 2.4, 1.0, 0.5, 0x9a8a74, 'locker', { deco: 1 }));
+  boxes.push(B(0, FH * 3 + 1.6, -23.6, 1.5, 1.5, 0.15, 0xf6f6f0, 'metal', { deco: 1 }));
+  boxes.push(B(0, FH * 3 + 2.25, -23.55, 0.1, 0.55, 0.08, 0x22262c, 'metal', { deco: 1 }));
+  boxes.push(B(0.22, FH * 3 + 2.3, -23.55, 0.42, 0.1, 0.08, 0x22262c, 'metal', { deco: 1 }));
+  boxes.push(B(-2.6, 0, 39.6, 0.9, 2.0, 0.9, 0x8a8478, 'stone', { deco: 1 }));
+  boxes.push(B(2.6, 0, 39.6, 0.9, 2.0, 0.9, 0x8a8478, 'stone', { deco: 1 }));
+  boxes.push(B(0, 0, 39.6, 4.2, 1.5, 0.12, 0x6a7480, 'metal', { deco: 1 }));
+  boxes.push(B(3.4, 1.0, 39.15, 0.5, 0.9, 0.1, 0xe8e2d4, 'stone', { deco: 1 }));
+  boxes.push(B(-11, 0, 24, 0.12, 7, 0.12, 0xb8c0c8, 'metal', { deco: 1 }));
+  boxes.push(B(-10.45, 6.1, 24, 1.0, 0.7, 0.06, 0xffffff, 'metal', { deco: 1 }));
+  boxes.push(B(-18, 0, 12, 0.7, 1.3, 0.7, 0xf4f4ee, 'wood', { deco: 1 }));
+  boxes.push(B(-18, 1.3, 12, 0.9, 0.15, 0.9, 0x8a8478, 'wood', { deco: 1 }));
   const LINE = 0xf0ead8;
   boxes.push(B(-34, 0.125, 16.5, 15, 0.012, 0.12, LINE, 'tile', { deco: 1 }));
   boxes.push(B(-34, 0.125, 31.5, 15, 0.012, 0.12, LINE, 'tile', { deco: 1 }));
@@ -581,80 +716,27 @@ function buildSchool() {
   boxes.push(B(-41.5, 0.125, 24, 0.12, 0.012, 15, LINE, 'tile', { deco: 1 }));
   boxes.push(B(-34, 0.125, 24, 15, 0.012, 0.12, LINE, 'tile', { deco: 1 }));
   boxes.push(B(-22.35, 4.5, 24, 0.15, 1.2, 2.6, 0x1e2a22, 'metal', { deco: 1 }));
-  // 器具庫 (牢屋)
-  boxes.push(...wallX(-27, -22, 28, 0, 3.0, 0.4, [[-26.2, -24.2]], 0x9a8a74));
-  boxes.push(...wallZ(28, 34, -27, 0, 3.0, 0.4, [], 0x9a8a74));
-  boxes.push(B(-23.5, 0, 33, 2.5, 0.9, 1.2, 0x8a7a64, 'wood'));
-
-  // ---- 渡り廊下 (校舎西端→体育館) ----
-  boxes.push(B(-29, 0, -6.5, 3, 0.1, 41, 0x9aa4ae, 'tile'));
-  for (const pz of [-24, -14, -4, 6]) {
-    boxes.push(B(-30.3, 0, pz, 0.25, 2.7, 0.25, 0x98a2ac, 'metal'));
-    boxes.push(B(-27.7, 0, pz, 0.25, 2.7, 0.25, 0x98a2ac, 'metal'));
-  }
-  boxes.push(B(-29, 2.7, -5, 3.4, 0.18, 38, 0xb0b8c0, 'metal'));
-
-  // ---- プール (25m級・フェンス囲い) ----
-  boxes.push(B(36, 0, 25, 20, 0.12, 18, 0x9fc8d8, 'tile'));
-  boxes.push(...wallX(26, 46, 16, 0, 1.9, 0.25, [[27, 29.4]], FENCE, 'fence'));
-  boxes.push(...wallX(26, 46, 34, 0, 1.9, 0.25, [], FENCE, 'fence'));
-  boxes.push(...wallZ(16, 34, 26, 0, 1.9, 0.25, [[19, 21.4]], FENCE, 'fence'));
-  boxes.push(...wallZ(16, 34, 46, 0, 1.9, 0.25, [], FENCE, 'fence'));
-  boxes.push(...wallX(29, 45, 19.5, 0, 0.45, 0.35, [], 0xd8e2e8, 'tile'));
-  boxes.push(...wallX(29, 45, 30.5, 0, 0.45, 0.35, [], 0xd8e2e8, 'tile'));
-  boxes.push(...wallZ(19.5, 30.5, 29, 0, 0.45, 0.35, [], 0xd8e2e8, 'tile'));
-  boxes.push(...wallZ(19.5, 30.5, 45, 0, 0.45, 0.35, [], 0xd8e2e8, 'tile'));
-  boxes.push(B(37, 0, 25, 15.6, 0.28, 10.6, 0x58b8e8, 'water', { deco: 1, glow: 1 }));
-  for (const sx of [31, 34, 37, 40, 43]) boxes.push(B(sx, 0, 18.4, 1.2, 0.55, 0.9, 0xd0d5da, 'metal'));
-
-  // ---- 校庭: 朝礼台・国旗掲揚塔・サッカーゴール・鉄棒・砂場 ----
-  boxes.push(B(0, 0, -22, 2.2, 0.9, 2.2, 0x98a2ac, 'metal'));
-  boxes.push(...stairs(1.6, 0, -22, 'e', 1.4, 3, 0.3, 0.4, 0x98a2ac, 'metal'));
-  boxes.push(B(-4, 0, -24, 0.14, 7.5, 0.14, 0xb8c0c8, 'metal', { deco: 1 }));
-  boxes.push(B(-3.45, 6.6, -24, 1.0, 0.7, 0.06, 0xffffff, 'metal', { deco: 1 }));
-  for (const gz of [-16, 4]) {
-    boxes.push(B(-8 - 2.2, 0, gz, 0.15, 1.9, 0.15, 0xffffff, 'metal', { deco: 1 }));
-    boxes.push(B(-8 + 2.2, 0, gz, 0.15, 1.9, 0.15, 0xffffff, 'metal', { deco: 1 }));
-    boxes.push(B(-8, 1.9, gz, 4.55, 0.15, 0.15, 0xffffff, 'metal', { deco: 1 }));
-  }
-  boxes.push(B(-8, 0.005, -6, 0.1, 0.02, 19.5, 0xe8e0cc, 'dirt', { deco: 1 }));
-  boxes.push(B(-8, 0.005, -6, 14, 0.02, 0.1, 0xe8e0cc, 'dirt', { deco: 1 }));
-  for (let i = 0; i < 3; i++) boxes.push(B(14 + i * 2.2, 0, -14, 0.15, 1.3 + i * 0.25, 0.15, 0x888888, 'metal', { deco: 1 }));
-  boxes.push(B(21, 0, -13.5, 5, 0.25, 4, 0xe0cfa0, 'dirt'));
-  boxes.push(B(14, 0, 2, 0.7, 1.3, 0.7, 0xf4f4ee, 'wood', { deco: 1 }));
-  boxes.push(B(14, 1.3, 2, 0.9, 0.15, 0.9, 0x8a8478, 'wood', { deco: 1 }));
-  // 校門・門柱・二宮金次郎像・校名板
-  boxes.push(B(-3.5, 0, 39.2, 1.0, 2.0, 1.0, 0x8a8478, 'stone'));
-  boxes.push(B(3.5, 0, 39.2, 1.0, 2.0, 1.0, 0x8a8478, 'stone'));
-  boxes.push(B(4.2, 1.0, 38.65, 0.55, 0.95, 0.1, 0xe8e2d4, 'stone', { deco: 1 }));
-  boxes.push(B(0, 0, 8, 3, 0.1, 62, 0x9aa4ae, 'tile'));
-  boxes.push(B(6.5, 0, -25.5, 0.5, 0.9, 0.5, 0x8a8478, 'stone', { deco: 1 }));
-  boxes.push(B(6.5, 0.9, -25.5, 0.4, 0.7, 0.4, 0x6a7480, 'stone', { deco: 1 }));
-  // 桜並木
-  for (const [tx, tz] of [[49, -30], [49, -20], [49, 20], [49, 30], [14, 37], [-14, 37], [26, 37], [-49, -20], [-49, 0], [-49, 10], [-42, -34], [40, -34], [-38, 37], [-46, 37]]) {
-    boxes.push(B(tx, 0, tz, 0.7, 2.6, 0.7, 0x6a4a34, 'wood'));
-    boxes.push(B(tx, 2.4, tz, 3.4, 2.4, 3.4, ((tx + tz) & 1) ? 0xf7c1d4 : 0xf0a8c0, 'leaf', { deco: 1 }));
-  }
-  // 飼育小屋
-  boxes.push(...wallX(40, 46, -34, 0, 1.6, 0.2, [], FENCE, 'fence'));
-  boxes.push(...wallX(40, 46, -30, 0, 1.6, 0.2, [[42, 44]], FENCE, 'fence'));
-  boxes.push(...wallZ(-34, -30, 40, 0, 1.6, 0.2, [], FENCE, 'fence'));
-  boxes.push(...wallZ(-34, -30, 46, 0, 1.6, 0.2, [], FENCE, 'fence'));
-  boxes.push(B(43, 1.7, -32, 6.6, 0.15, 4.6, 0x8a7a5a, 'wood', { deco: 1 }));
-
+  boxes.push(B(-38, 0, 33.55, 2.2, 2.8, 0.15, 0xb08a54, 'wood', { deco: 1 }));
+  boxes.push(B(-31, 0, 33.55, 2.2, 2.8, 0.15, 0xb08a54, 'wood', { deco: 1 }));
+  boxes.push(B(28.2, 0, 11, 0.15, 1.8, 0.15, 0xffffff, 'metal', { deco: 1 }));
+  boxes.push(B(31.8, 0, 11, 0.15, 1.8, 0.15, 0xffffff, 'metal', { deco: 1 }));
+  boxes.push(B(30, 1.8, 11, 3.75, 0.15, 0.15, 0xffffff, 'metal', { deco: 1 }));
+  boxes.push(B(12, 0.005, 12.4, 20, 0.02, 0.1, 0xe8e0cc, 'dirt', { deco: 1 }));
+  boxes.push(B(12, 0.005, 13.6, 20, 0.02, 0.1, 0xe8e0cc, 'dirt', { deco: 1 }));
+  for (let i = 0; i < 3; i++) boxes.push(B(40 + i * 2.6, 0, 5, 1.6, 0.85, 0.14, [0xcc4455, 0x4477cc, 0x55aa66][i], 'metal', { deco: 1 }));
   return {
     id: 'school', name: '学校', boxes,
     sky: 0xffb37a, fog: { color: 0xffc490, near: 55, far: 185 },
     ambient: 0.65, sun: 0.9, sunColor: 0xffd9a8,
-    lights: [{ x: -34, y: 6.5, z: 24, c: 0xfff4dd, i: 24, d: 28 }, { x: 0, y: 4, z: -20, c: 0xfff4dd, i: 16, d: 20 }, { x: 36, y: 4.5, z: 25, c: 0xfff4dd, i: 20, d: 24 }],
+    lights: [{ x: -34, y: 6.5, z: 24, c: 0xfff4dd, i: 24, d: 28 }, { x: 0, y: 4, z: -10, c: 0xfff4dd, i: 16, d: 20 }, { x: 35, y: 4.5, z: 25, c: 0xfff4dd, i: 20, d: 24 }],
     bounds: { minX: -51, maxX: 51, minZ: -39, maxZ: 39 },
     jail: { x: -24.5, y: 0, z: 31, w: 4.5, d: 5 },
     spawns: {
-      oni: [[0, 0.1, -6], [2.5, 0.1, -3], [-2.5, 0.1, -3], [2.5, 0.1, -9], [-2.5, 0.1, -9], [0, 0.1, -1], [4.5, 0.1, -6], [-4.5, 0.1, -6]],
+      oni: [[4, 0.1, 16], [-2, 0.1, 20], [1, 0.1, 18], [4, 0.1, 20], [8, 0.1, 14], [0, 0.1, 14], [12, 0.1, 18], [4, 0.1, 12]],
       run: [
-        [-24, 0.3, -36.3], [24, 0.3, -36.3], [0, 0.3, -36.3], [-24, FH + 0.3, -36.3], [24, FH + 0.3, -36.3],
-        [0, FH * 2 + 0.3, -36.3], [0, ROOF + 0.1, -33], [-34, 0.3, 24], [36, 0.4, 25],
-        [21, 0.4, -13.5], [0, 0.1, 36], [0, 0.1, -30]
+        [-28, 0.3, -26], [28, 0.3, -26], [0, 0.3, -26], [-22, 0.3, -8], [22, 0.3, -8], [0, 0.1, -10],
+        [-12, FH + 0.3, -26], [12, FH * 2 + 0.3, -26], [0, FH * 3 + 0.3, -26], [0, ROOF + 0.1, -31],
+        [-34, 0.3, 24], [35, 0.4, 25], [11, 0.3, -33], [45, 0.1, -2]
       ]
     }
   };
