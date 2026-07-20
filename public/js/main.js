@@ -273,6 +273,9 @@ function initRenderer() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, input.isTouch ? 2 : 2));
   renderer.shadowMap.enabled = !input.isTouch;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // フィルミックトーンマッピングで白飛び/黒つぶれを抑え、写実的な階調にする
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
   camera = new THREE.PerspectiveCamera(78, innerWidth / innerHeight, 0.1, 320);
   window.addEventListener('resize', () => {
     renderer.setSize(innerWidth, innerHeight);
@@ -519,6 +522,10 @@ net.on('ev', ev => {
       updateCountHUD();
       break;
     }
+    case 'jailbreak': {
+      hudMsg(`🔓 脱獄! ${ev.byName} が牢屋の仲間 ${ev.count}人を解放した!`, '#ffd166');
+      break;
+    }
     case 'frozen': {
       SFX.frozen();
       paintOn(r, ev.by);
@@ -732,7 +739,7 @@ function loop(t) {
       if (r.id === g.meId || r.role !== 'run' || r.jailed || r.frozen) continue;
       const rp = r.hum.root.position;
       const dx = rp.x - g.pos.x, dz = rp.z - g.pos.z;
-      if (dx * dx + dz * dz < 1.2 * 1.2 && Math.abs(rp.y - g.pos.y) < 1.5) {
+      if (dx * dx + dz * dz < 1.1 * 1.1 && Math.abs(rp.y - g.pos.y) < 1.5) {
         if (now - (g.lastCatchReq || 0) > 180) {
           g.lastCatchReq = now;
           net.touchPlayer(r.id);
@@ -762,7 +769,7 @@ function loop(t) {
   meR.hum.setFrozen(g.frozen);
   meR.hum.update({ dt, speed: hSpeed, velY: g.vel.y, onGround: g.onGround, frozen: g.frozen, jailed: g.jailed });
 
-  const renderT = now - 130;
+  const renderT = now - 115;
   for (const r of g.remotes.values()) {
     if (r.id === g.meId) continue;
     const buf = r.buf;

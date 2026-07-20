@@ -460,7 +460,7 @@ export function buildWorld(scene, mapId, quality) {
   const jail = map.jail;
   const jm = new THREE.Mesh(
     new THREE.PlaneGeometry(jail.w, jail.d),
-    new THREE.MeshBasicMaterial({ color: 0xffcc44, transparent: true, opacity: 0.14, side: THREE.DoubleSide })
+    new THREE.MeshBasicMaterial({ color: 0xff7a3a, transparent: true, opacity: 0.26, side: THREE.DoubleSide })
   );
   jm.rotation.x = -Math.PI / 2;
   jm.position.set(jail.x, jail.y + 0.06, jail.z);

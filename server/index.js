@@ -23,9 +23,15 @@ const PORT = process.env.PORT || 3000;
 
 const MODES = { doro: '泥警', koori: '氷鬼', kawari: '代わり鬼' };
 const MAX_PLAYERS = 10;
-const CATCH_RANGE = 1.35;
+// 捕獲判定: 体(カプセル半径0.32)同士が実際に触れるのは中心間0.64m。
+// 「接触してないのに捕まる」を防ぐため、以前の1.35mから体の接触に近い値へ縮小。
+const CATCH_RANGE = 1.1;
 const CATCH_DY = 1.5;
-const CATCH_LAG_SLACK = 1.2;
+// ラグ補償: 逃げ側の画面では鬼が補間遅延ぶん過去の位置に見える(＝実サーバー位置より後ろ)。
+// そのぶん鬼の位置を過去にさかのぼって判定し、「画面で見えている鬼の位置」で捕まえる。
+const CATCH_LAG_COMP = 100;   // ms — クライアント補間遅延にほぼ一致させる
+const CATCH_LAG_SLACK = 0.4;
+const HIST_MS = 600;          // 位置履歴の保持時間
 const NO_CATCH_WHISTLE_MS = 30000;
 const TOUCH_RANGE = 1.7;
 const GRACE_MS = 5000;
@@ -43,6 +49,27 @@ function solidsFor(mapId) {
 function catchBlocked(mapId, a, b) {
   const h = Math.max(a[1], b[1]) + 0.85;
   return losBlocked([a[0], h, a[2]], [b[0], h, b[2]], solidsFor(mapId));
+}
+
+// 各プレイヤーの位置履歴に現在地を記録 (ラグ補償用のリングバッファ)
+function recordHist(gp, now) {
+  const h = gp.hist || (gp.hist = []);
+  h.push({ t: now, p: [gp.pos[0], gp.pos[1], gp.pos[2]] });
+  while (h.length > 2 && now - h[0].t > HIST_MS) h.shift();
+}
+// t (ms) 時点の位置を履歴から補間して返す。履歴が無ければ現在地。
+function posAt(gp, t) {
+  const h = gp.hist;
+  if (!h || !h.length) return gp.pos;
+  for (let i = h.length - 1; i >= 0; i--) {
+    if (h[i].t <= t) {
+      const a = h[i], b = h[i + 1];
+      if (!b) return a.p;
+      const k = Math.max(0, Math.min(1, (t - a.t) / Math.max(1, b.t - a.t)));
+      return [a.p[0] + (b.p[0] - a.p[0]) * k, a.p[1] + (b.p[1] - a.p[1]) * k, a.p[2] + (b.p[2] - a.p[2]) * k];
+    }
+  }
+  return h[0].p;
 }
 
 const navCache = new Map();
@@ -211,6 +238,8 @@ class Room {
       }, 50);
     }
     this.snapIv = setInterval(() => {
+      const now = Date.now();
+      for (const p of g.players.values()) recordHist(p, now);
       this.checkCatches();
       const ps = {};
       for (const [id, p] of g.players) ps[id] = [+p.pos[0].toFixed(2), +p.pos[1].toFixed(2), +p.pos[2].toFixed(2), +p.ry.toFixed(2), p.anim];
@@ -261,12 +290,14 @@ class Room {
     const onis = [...g.players.values()].filter(p => p.role === 'oni' && !p.jailed && !p.frozen);
     for (const oni of onis) {
       if (oni.role !== 'oni' || oni.jailed || oni.frozen) continue; // onHitで役割が変わり得るため再確認
+      // 逃げ側の画面で見えている鬼の位置(補間遅延ぶん過去)で判定する
+      const oniPos = posAt(oni, now - CATCH_LAG_COMP);
       let best = null, bestD2 = Infinity;
       for (const tp of g.players.values()) {
         if (tp.id === oni.id || tp.role !== 'run' || tp.jailed || tp.frozen) continue;
         if (now < tp.immuneUntil) continue;
-        const dx = tp.pos[0] - oni.pos[0], dz = tp.pos[2] - oni.pos[2];
-        const dy = Math.abs(tp.pos[1] - oni.pos[1]);
+        const dx = tp.pos[0] - oniPos[0], dz = tp.pos[2] - oniPos[2];
+        const dy = Math.abs(tp.pos[1] - oniPos[1]);
         const d2 = dx * dx + dz * dz;
         if (d2 < CATCH_RANGE * CATCH_RANGE && dy < CATCH_DY && d2 < bestD2) { bestD2 = d2; best = tp; }
       }
@@ -308,8 +339,9 @@ class Room {
       const now = Date.now();
       if (now < g.graceUntil) return;
       if (tp.role !== 'run' || tp.jailed || tp.frozen || now < tp.immuneUntil) return;
-      const d2 = Math.hypot(gp.pos[0] - tp.pos[0], gp.pos[2] - tp.pos[2]);
-      if (d2 > CATCH_RANGE + CATCH_LAG_SLACK || Math.abs(gp.pos[1] - tp.pos[1]) > 1.6) return;
+      const oniPos = posAt(gp, now - CATCH_LAG_COMP);   // ラグ補償(checkCatchesと同じ)
+      const d = Math.hypot(oniPos[0] - tp.pos[0], oniPos[2] - tp.pos[2]);
+      if (d > CATCH_RANGE + CATCH_LAG_SLACK || Math.abs(oniPos[1] - tp.pos[1]) > 1.6) return;
       if (catchBlocked(this.mapId, gp.pos, tp.pos)) return;   // 壁越しキャッチ防止
       this.onHit(gp, tp);
       return;
@@ -318,9 +350,15 @@ class Room {
     const dist = Math.hypot(gp.pos[0] - tp.pos[0], gp.pos[1] - tp.pos[1], gp.pos[2] - tp.pos[2]);
     if (dist > TOUCH_RANGE + 1.0) return;
     if (this.mode === 'doro' && tp.jailed) {
-      tp.jailed = false;
-      gp.stats.rescues++;
-      io.to(this.id).emit('ev', { type: 'rescued', id: targetId, by: p.id, name: this.members.get(targetId)?.name, byName: p.name });
+      // 泥警の定番ルール: 1人助けると牢屋の仲間が全員脱獄できる。
+      // → 捕まっても「詰み」にならず、鬼は1箇所を固め続けても意味がなくなる。
+      const freed = [...g.players.values()].filter(x => x.role === 'run' && x.jailed);
+      for (const f of freed) {
+        f.jailed = false;
+        io.to(this.id).emit('ev', { type: 'rescued', id: f.id, by: p.id, name: this.members.get(f.id)?.name, byName: p.name });
+      }
+      gp.stats.rescues += freed.length;
+      if (freed.length > 1) io.to(this.id).emit('ev', { type: 'jailbreak', by: p.id, byName: p.name, count: freed.length });
     } else if (this.mode === 'koori' && tp.frozen) {
       tp.frozen = false;
       gp.stats.rescues++;
