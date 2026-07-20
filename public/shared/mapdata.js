@@ -93,8 +93,11 @@ function rock(boxes, cx, cy, cz, sx, sy, sz, col, ry = 0, rx = 0, rz = 0, mat = 
 }
 
 // 丸い岩 (楕円体)。裾の瓦礫や転石、天井のこぶに。seg/segH で低ポリ化。
-function boulder(boxes, cx, cy, cz, sx, sy, sz, col, mat = 'stone', seg = 6, segH = 4) {
-  boxes.push({ x: cx, y: cy - sy / 2, z: cz, w: sx, h: sy, d: sz, c: col, m: mat, deco: 1, shape: 'sph', seg, segH });
+// solid=true で当たり判定あり(通せんぼできる転石。判定は軸並行AABB)。
+function boulder(boxes, cx, cy, cz, sx, sy, sz, col, mat = 'stone', seg = 6, segH = 4, solid = false) {
+  const b = { x: cx, y: cy - sy / 2, z: cz, w: sx, h: sy, d: sz, c: col, m: mat, shape: 'sph', seg, segH };
+  if (!solid) b.deco = 1;
+  boxes.push(b);
 }
 
 // 円柱の柱 (rt/rb で円錐・樽形にもなる)。opt.solid=true で当たり判定あり(石柱)。
@@ -109,9 +112,12 @@ function column(boxes, cx, y0, cz, rad, h, col, opt = {}) {
 }
 
 // 鍾乳石 (up=false: 天井 y から下へ) / 石筍 (up=true: 床 y から上へ)。円錐。
-function drip(boxes, cx, y, cz, rad, h, up, col) {
-  if (up) boxes.push({ x: cx, y, z: cz, w: rad * 2, h, d: rad * 2, c: col, m: 'stone', deco: 1, shape: 'cyl', rt: 0.05, rb: 1, seg: 7 });
-  else boxes.push({ x: cx, y: y - h, z: cz, w: rad * 2, h, d: rad * 2, c: col, m: 'stone', deco: 1, shape: 'cyl', rt: 1, rb: 0.05, seg: 7 });
+// solid=true で当たり判定あり(床の石筍を障害物に。天井の鍾乳石は頭上なので通常 deco)。
+function drip(boxes, cx, y, cz, rad, h, up, col, solid = false) {
+  const b = { x: cx, y: up ? y : y - h, z: cz, w: rad * 2, h, d: rad * 2, c: col, m: 'stone',
+    shape: 'cyl', rt: up ? 0.05 : 1, rb: up ? 1 : 0.05, seg: 7 };
+  if (!solid) b.deco = 1;
+  boxes.push(b);
 }
 
 // rects で定義される「開いた空間」の占有グリッド (carveRock と同じ判定)。
@@ -473,9 +479,9 @@ function buildCave() {
   const stal = [[-13, -35], [8, -31], [-33, -25], [30, -16], [-15, 17], [22, 23], [-36, 5], [36, 6], [12, 34], [-4, 28]];
   for (const [sx, sz] of stal) {
     const h = 2.0 + ((sx * 7 + sz * 13 + 100) % 10) / 6;
-    drip(boxes, sx, 0, sz, 0.55, h, true, 0x51443a);
-    boulder(boxes, sx + 0.3, 0.3, sz - 0.2, 1.3, 0.75, 1.3, 0x4a3d30);
-    drip(boxes, sx + 0.75, 0, sz + 0.45, 0.3, 0.9 + ((sx * 3 + sz) % 4) * 0.25, true, 0x51443a);
+    drip(boxes, sx, 0, sz, 0.55, h, true, 0x51443a, true);       // 石筍=当たり判定あり(障害物・遮蔽)
+    boulder(boxes, sx + 0.3, 0.3, sz - 0.2, 1.3, 0.75, 1.3, 0x4a3d30, 'stone', 6, 4, true); // 根元の岩も固く
+    drip(boxes, sx + 0.75, 0, sz + 0.45, 0.3, 0.9 + ((sx * 3 + sz) % 4) * 0.25, true, 0x51443a, true);
   }
 
   // 鍾乳石 (天井から下向きの円錐)
@@ -522,7 +528,7 @@ function buildCave() {
       const h = 0.9 + cryR() * 1.4, rad = 0.16 + cryR() * 0.18;
       const tilt = (cryR() - 0.5) * 0.5;
       boxes.push({ x: cx + Math.cos(ang) * dist, y: cy, z: cz + Math.sin(ang) * dist,
-        w: rad * 2, h, d: rad * 2, c: cc, m: 'crystal', deco: 1, glow: 1,
+        w: rad * 2, h, d: rad * 2, c: cc, m: 'crystal', glow: 1,   // 群晶=当たり判定あり(遮蔽)
         shape: 'cyl', rt: 0.04, rb: 1, seg: 6, rx: Math.sin(ang) * tilt, rz: -Math.cos(ang) * tilt });
     }
   }
@@ -550,14 +556,14 @@ function buildCave() {
       const ang = outR() * Math.PI * 2, dist = outR() * 1.4;
       const h = 1.0 + outR() * 1.8, rad = 0.18 + outR() * 0.22, tilt = (outR() - 0.5) * 0.5;
       boxes.push({ x: cx + Math.cos(ang) * dist, y: 0, z: cz + Math.sin(ang) * dist,
-        w: rad * 2, h, d: rad * 2, c: cc, m: 'crystal', deco: 1, glow: 1,
+        w: rad * 2, h, d: rad * 2, c: cc, m: 'crystal', glow: 1,   // 群晶=当たり判定あり
         shape: 'cyl', rt: 0.04, rb: 1, seg: 6, rx: Math.sin(ang) * tilt, rz: -Math.cos(ang) * tilt });
     }
-    // 石筍・転石を散らす
+    // 石筍・転石を散らす(当たり判定あり=遮蔽物。広い四隅空洞なので通行は塞がない)
     for (let s = 0; s < 4; s++) {
       const px = cx + (outR() - 0.5) * 7, pz = cz + (outR() - 0.5) * 7;
-      drip(boxes, px, 0, pz, 0.4 + outR() * 0.3, 1.4 + outR() * 1.6, true, 0x51443a);
-      boulder(boxes, px + 0.4, 0.25, pz - 0.3, 1.0 + outR(), 0.6, 1.0 + outR(), outR() < 0.5 ? 0x4a3d30 : 0x574839);
+      drip(boxes, px, 0, pz, 0.4 + outR() * 0.3, 1.4 + outR() * 1.6, true, 0x51443a, true);
+      boulder(boxes, px + 0.4, 0.25, pz - 0.3, 1.0 + outR(), 0.6, 1.0 + outR(), outR() < 0.5 ? 0x4a3d30 : 0x574839, 'stone', 6, 4, true);
     }
     // 天井から鍾乳石
     for (let s = 0; s < 3; s++) drip(boxes, cx + (outR() - 0.5) * 6, LH, cz + (outR() - 0.5) * 6, 0.28, 1.0 + outR() * 1.4, false, 0x4a3d30);
@@ -575,8 +581,9 @@ function buildCave() {
     const ang = (t / 40) * Math.PI * 2;
     const rx = 49.5 + (outR() - 0.5) * 2.4, rz = 49.5 + (outR() - 0.5) * 2.4;
     const px = Math.cos(ang) * rx, pz = Math.sin(ang) * rz;
-    // 回廊の中心線付近に低い装飾のみ (通行を塞がない)
-    if (outR() < 0.5) drip(boxes, px, 0, pz, 0.32, 1.0 + outR() * 1.2, true, 0x51443a);
+    // 回廊の中心線付近に配置。石筍は当たり判定あり(細いので回廊は塞がない=遮蔽物)、
+    // 低い転石は踏み越えられるよう deco のまま。
+    if (outR() < 0.5) drip(boxes, px, 0, pz, 0.32, 1.0 + outR() * 1.2, true, 0x51443a, true);
     else boulder(boxes, px, 0.12, pz, 0.8 + outR() * 0.6, 0.35, 0.8 + outR() * 0.6, outR() < 0.5 ? 0x4a3d30 : 0x574839);
     if (outR() < 0.22) {
       const gc = cornerCols[(outR() * 4) | 0];
