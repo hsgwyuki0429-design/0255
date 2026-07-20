@@ -338,6 +338,40 @@ function scaleBoxUV(geo, b) {
   }
 }
 
+// 円柱/球など曲面プリミティブの UV をおおむね1m周期にスケールする(質感の引き伸ばし防止)
+function scaleGenericUV(geo, b) {
+  const uv = geo.attributes.uv;
+  if (!uv) return;
+  const s = Math.max(b.w, b.h, b.d) * UV_K;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * s, uv.getY(i) * s);
+}
+
+// ボックスに加え、円柱(cyl: 円錐にもなる rt/rb)・楕円体(sph)・任意軸回転(rx/ry/rz)を
+// サポートする。原点中心で作って回転→ワールド位置へ移動。底面が y に来るよう +h/2 する。
+function makeGeo(b) {
+  let g;
+  if (b.shape === 'cyl') {
+    const r = Math.min(b.w, b.d) / 2;
+    const seg = b.seg || 12;
+    g = new THREE.CylinderGeometry(r * (b.rt ?? 1), r * (b.rb ?? 1), b.h, seg, 1, false);
+    // 楕円断面(w≠d)にも対応
+    if (b.w !== b.d) g.scale(b.w / Math.min(b.w, b.d), 1, b.d / Math.min(b.w, b.d));
+    scaleGenericUV(g, b);
+  } else if (b.shape === 'sph') {
+    g = new THREE.SphereGeometry(0.5, b.seg || 8, b.segH || 6);
+    g.scale(b.w, b.h, b.d);
+    scaleGenericUV(g, b);
+  } else {
+    g = new THREE.BoxGeometry(b.w, b.h, b.d);
+    scaleBoxUV(g, b);
+  }
+  if (b.rx) g.rotateX(b.rx);
+  if (b.ry) g.rotateY(b.ry);
+  if (b.rz) g.rotateZ(b.rz);
+  g.translate(b.x, b.y + b.h / 2, b.z);
+  return g;
+}
+
 // ============================================================
 // グラデーション天球 (地平線→天頂 + 任意の太陽グロー)
 // ============================================================
@@ -401,10 +435,7 @@ export function buildWorld(scene, mapId, quality) {
     if (b.w <= 0 || b.h <= 0 || b.d <= 0) continue;
     const key = b.c + '|' + b.m + '|' + (b.glow ? 1 : 0);
     if (!buckets.has(key)) buckets.set(key, []);
-    const g = new THREE.BoxGeometry(b.w, b.h, b.d);
-    scaleBoxUV(g, b);
-    g.translate(b.x, b.y + b.h / 2, b.z);
-    buckets.get(key).push(g);
+    buckets.get(key).push(makeGeo(b));
   }
   for (const [key, geos] of buckets) {
     const [c, m, glow] = key.split('|');

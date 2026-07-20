@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Map Preview</title>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#000}#c{display:block;width:100vw;height:100vh}</style>
+<script type="importmap">
+{ "imports": {
+  "three": "/vendor/three.module.js",
+  "three/addons/utils/BufferGeometryUtils.js": "/vendor/BufferGeometryUtils.js"
+} }
+</script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+import * as THREE from 'three';
+import { buildWorld } from '/js/world.js';
+
+const q = new URLSearchParams(location.search);
+const mapId = q.get('map') || 'cave';
+const px = parseFloat(q.get('x') ?? '0');
+const py = parseFloat(q.get('y') ?? '6');
+const pz = parseFloat(q.get('z') ?? '0');
+const yaw = parseFloat(q.get('yaw') ?? '0');
+const pitch = parseFloat(q.get('pitch') ?? '-0.15');
+const fov = parseFloat(q.get('fov') ?? '75');
+
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(1);
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(fov, innerWidth / innerHeight, 0.1, 400);
+buildWorld(scene, mapId, { shadows: true, high: true });
+
+// Inspection light override (?lit=1) — brightens the scene so geometry is legible in screenshots.
+if (q.get('lit') === '1') {
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x556677, 1.4));
+  const d = new THREE.DirectionalLight(0xffffff, 1.1);
+  d.position.set(20, 40, 15); scene.add(d);
+  const d2 = new THREE.DirectionalLight(0xbbccff, 0.6);
+  d2.position.set(-25, 20, -20); scene.add(d2);
+  if (scene.fog) scene.fog.far *= 2.2;
+}
+
+camera.position.set(px, py, pz);
+const look = new THREE.Vector3(
+  px + Math.sin(yaw) * Math.cos(pitch),
+  py + Math.sin(pitch),
+  pz + Math.cos(yaw) * Math.cos(pitch)
+);
+camera.lookAt(look);
+
+let frames = 0;
+function render() {
+  renderer.render(scene, camera);
+  frames++;
+  if (frames < 8) requestAnimationFrame(render);
+  else window.__ready = true;
+}
+render();
+</script>
+</body>
+</html>
