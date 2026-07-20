@@ -73,6 +73,143 @@ function carveRock(boxes, rects, baseY, height, N, off, cA, cB) {
   }
 }
 
+// ---- 有機的な岩ジオメトリ用ヘルパー (ボックス限界の解除) ----
+// すべて中心座標指定。deco(当たり判定なし)で「見た目」を自然な岩肌にする。
+// 当たり判定は従来どおり別途の軸並行ボックスが担うので、CPUナビ/衝突は不変。
+
+function mulberry(seed) {
+  let a = seed >>> 0 || 1;
+  return () => {
+    a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// 岩塊 (任意軸に傾けた箱)。低ポリで安価に「ゴツゴツした岩の面」を作る。
+function rock(boxes, cx, cy, cz, sx, sy, sz, col, ry = 0, rx = 0, rz = 0, mat = 'stone') {
+  boxes.push({ x: cx, y: cy - sy / 2, z: cz, w: sx, h: sy, d: sz, c: col, m: mat, deco: 1, ry, rx, rz });
+}
+
+// 丸い岩 (楕円体)。裾の瓦礫や転石、天井のこぶに。seg/segH で低ポリ化。
+function boulder(boxes, cx, cy, cz, sx, sy, sz, col, mat = 'stone', seg = 6, segH = 4) {
+  boxes.push({ x: cx, y: cy - sy / 2, z: cz, w: sx, h: sy, d: sz, c: col, m: mat, deco: 1, shape: 'sph', seg, segH });
+}
+
+// 円柱の柱 (rt/rb で円錐・樽形にもなる)。opt.solid=true で当たり判定あり(石柱)。
+function column(boxes, cx, y0, cz, rad, h, col, opt = {}) {
+  const b = { x: cx, y: y0, z: cz, w: rad * 2, h, d: (opt.radZ ?? rad) * 2, c: col, m: opt.mat || 'stone',
+    shape: 'cyl', rt: opt.rt ?? 1, rb: opt.rb ?? 1 };
+  if (opt.seg) b.seg = opt.seg;
+  if (!opt.solid) b.deco = 1;
+  if (opt.glow) b.glow = 1;
+  if (opt.ry) b.ry = opt.ry;
+  boxes.push(b);
+}
+
+// 鍾乳石 (up=false: 天井 y から下へ) / 石筍 (up=true: 床 y から上へ)。円錐。
+function drip(boxes, cx, y, cz, rad, h, up, col) {
+  if (up) boxes.push({ x: cx, y, z: cz, w: rad * 2, h, d: rad * 2, c: col, m: 'stone', deco: 1, shape: 'cyl', rt: 0.05, rb: 1, seg: 7 });
+  else boxes.push({ x: cx, y: y - h, z: cz, w: rad * 2, h, d: rad * 2, c: col, m: 'stone', deco: 1, shape: 'cyl', rt: 1, rb: 0.05, seg: 7 });
+}
+
+// rects で定義される「開いた空間」の占有グリッド (carveRock と同じ判定)。
+function caveOpenGrid(rects, N, off) {
+  const open = [];
+  for (let i = 0; i < N; i++) {
+    open.push(new Array(N));
+    for (let j = 0; j < N; j++) {
+      const cx = off + i + 0.5, cz = off + j + 0.5;
+      let o = false;
+      for (const [x1, x2, z1, z2] of rects) { if (cx > x1 && cx < x2 && cz > z1 && cz < z2) { o = true; break; } }
+      open[i][j] = o;
+    }
+  }
+  return open;
+}
+
+// 洞窟1層ぶんの有機的クラッディング。
+//   open: この層の占有グリッド / above: 上の層の占有グリッド(天井判定用, null=全て岩)
+//   壁面は「衝突面(セル境界)にほぼ面一で貼る傾いた岩ファセット」で覆い、平らな箱を
+//   ゴツゴツした岩肌に見せる。装飾は通路側へほとんど出っ張らせない(当たり判定はAABBのまま)。
+function cladCaveLevel(boxes, open, above, baseY, topY, N, off, cWall, cDark, seed, opt = {}) {
+  const rng = mulberry(seed);
+  const wallH = topY - baseY;
+  const cMid = shade(cWall, 0.86), cLite = shade(cWall, 1.12);
+  const shades = [cWall, cMid, cDark, cLite];
+  const inb = (i, j) => i >= 0 && j >= 0 && i < N && j < N;
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      if (!open[i][j]) continue;
+      const cx = off + i + 0.5, cz = off + j + 0.5;
+      // --- 壁面クラッディング (隣接セルが閉=岩の面) ---
+      const nb = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+      for (const [di, dj] of nb) {
+        const nopen = inb(i + di, j + dj) ? open[i + di][j + dj] : false;
+        if (nopen) continue;
+        const alongX = di === 0;                 // 壁が x 方向に伸びる
+        const facePos = 0.5;                      // セル境界=衝突面
+        // 壁面を覆う縦長ファセット。前面は衝突面付近、body は岩の中へ。高い壁は2枚。
+        const nSeg = wallH > 6 ? 2 : (rng() < 0.4 ? 2 : 1);
+        for (let s = 0; s < nSeg; s++) {
+          const segH = wallH / nSeg;
+          const bh = segH * (1.08 + rng() * 0.45);
+          const cy = baseY + segH * (s + 0.5) + (rng() - 0.5) * 0.5;
+          const bw = 0.95 + rng() * 0.85;          // 幅を狭めて面を割る(隣と重なる)
+          const depth = 0.5 + rng() * 0.6;         // 岩の奥行(大半は壁内)
+          const protr = 0.05 + rng() * 0.22;       // 通路側へのわずかな出っ張り
+          const tilt = (rng() - 0.5) * 0.72;       // 傾きを強めて同一平面を避ける
+          const off2 = (rng() - 0.5) * 0.5;        // 面に沿ってずらす
+          const col = shades[(rng() * shades.length) | 0];
+          const cxx = cx + di * (facePos - depth / 2 + protr) + (alongX ? off2 : 0);
+          const czz = cz + dj * (facePos - depth / 2 + protr) + (alongX ? 0 : off2);
+          rock(boxes, cxx, cy, czz, alongX ? bw : depth, bh, alongX ? depth : bw, col,
+               alongX ? tilt * 0.5 : (rng() - 0.5) * 0.3, alongX ? tilt : 0, alongX ? 0 : tilt);
+        }
+        // 近接時の平面割れ防止: 小さな岩チップを面一で重ねる(安価な箱)
+        if (rng() < 0.7) {
+          const chh = 0.6 + rng() * 1.3, chw = 0.5 + rng() * 0.8, chd = 0.3 + rng() * 0.35;
+          const cyc = baseY + wallH * (0.12 + rng() * 0.75);
+          const t = (rng() - 0.5) * 0.7;
+          rock(boxes, cx + di * (facePos - chd / 2 + 0.16), cyc, cz + dj * (facePos - chd / 2 + 0.16),
+               alongX ? chw : chd, chh, alongX ? chd : chw, shades[(rng() * shades.length) | 0],
+               alongX ? t * 0.6 : t * 0.3, alongX ? t : 0, alongX ? 0 : t);
+        }
+        // 中腹のふくらみ(丸い岩が壁から顔を出す)
+        if (rng() < 0.28) {
+          const rr = 0.7 + rng() * 0.9;
+          const cyb = baseY + wallH * (0.25 + rng() * 0.5);
+          boulder(boxes, cx + di * (facePos - rr * 0.35), cyb, cz + dj * (facePos - rr * 0.35),
+                  alongX ? rr * 1.9 : rr, rr * 1.5, alongX ? rr : rr * 1.9, rng() < 0.4 ? cDark : cMid);
+        }
+        // 裾の転石(通路に少しはみ出す低い岩)
+        if (rng() < 0.42) {
+          const rr = 0.55 + rng() * 0.8;
+          boulder(boxes, cx + di * (facePos - rr * 0.25) + (alongX ? (rng() - 0.5) * 0.6 : 0),
+                  baseY + rr * 0.26,
+                  cz + dj * (facePos - rr * 0.25) + (alongX ? 0 : (rng() - 0.5) * 0.6),
+                  rr * 1.5, rr, rr * 1.5, rng() < 0.5 ? cDark : cWall);
+        }
+      }
+      // --- 天井クラッディング (上の層が岩 = 天井がある) ---
+      const roofed = above ? !above[i][j] : true;
+      if (roofed && opt.ceiling && (i % 2 === 0) && (j % 2 === 0)) {
+        if (rng() < 0.9) {
+          const rr = 1.0 + rng() * 1.1;
+          boulder(boxes, cx + (rng() - 0.5), topY - rr * 0.2, cz + (rng() - 0.5), rr * 2.0, rr * 1.2, rr * 2.0, rng() < 0.5 ? cDark : cMid);
+        }
+        if (rng() < 0.3) drip(boxes, cx + (rng() - 0.5) * 0.6, topY, cz + (rng() - 0.5) * 0.6, 0.13 + rng() * 0.16, 0.5 + rng() * 1.4, false, cDark);
+      }
+      // --- 床の岩・小石 (まばら、低い) ---
+      if (opt.floor && rng() < 0.09) {
+        const rr = 0.5 + rng() * 1.0;
+        boulder(boxes, cx + (rng() - 0.5) * 0.8, baseY + 0.03, cz + (rng() - 0.5) * 0.8, rr, 0.15 + rng() * 0.14, rr * 0.85, rng() < 0.5 ? cDark : cMid);
+      }
+    }
+  }
+}
+
 // 色を明暗させる (面取り風トリムや葉の陰影に使う)
 function shade(hex, f) {
   const r = Math.min(255, Math.max(0, Math.round(((hex >> 16) & 255) * f)));
@@ -106,19 +243,19 @@ function canopy(boxes, cx, cz, baseY, rad, color, mat = 'leaf', colorB) {
   }
 }
 
-// 幹 (下部は当たり判定あり) + 立体樹冠。canopyColorB があれば明るい葉を混ぜる
+// 幹 (円柱・下部は当たり判定あり) + 立体樹冠。canopyColorB があれば明るい葉を混ぜる
 function tree(boxes, tx, tz, trunkH, trunkW, canR, colA, colB) {
-  boxes.push(B(tx, 0, tz, trunkW, trunkH, trunkW, 0x6a4a34, 'wood'));
-  // 幹上部を細くテーパーさせ、根元を少し広げて角の立ちを和らげる (deco)
-  boxes.push(B(tx, 0, tz, trunkW * 1.28, trunkW * 0.5, trunkW * 1.28, 0x5f4230, 'wood', { deco: 1 }));
+  const r = trunkW / 2;
+  column(boxes, tx, 0, tz, r, trunkH, 0x6a4a34, { solid: true, seg: 8, rt: 0.72, rb: 1.0, mat: 'wood' });
+  column(boxes, tx, 0, tz, r * 1.32, trunkW * 0.5, 0x5f4230, { seg: 8, rt: 0.66, rb: 1.08, mat: 'wood' }); // 根張り(deco)
   boxes.push(B(tx, trunkH, tz, trunkW * 0.8, canR * 0.42, trunkW * 0.8, 0x6a4a34, 'wood', { deco: 1 }));
   canopy(boxes, tx, tz, trunkH - canR * 0.18, canR, colA, 'leaf', colB);
 }
 
-// 花壇: 低い縁石(またぎ越せる高さ)+ 土 + 丸い花の盛り (すべて deco)
+// 花壇: 丸い縁石(またぎ越せる高さ)+ 土 + 丸い花の盛り (すべて deco)
 function flowerBed(boxes, x, z, rad, col, colB) {
-  boxes.push(B(x, 0, z, rad * 2 + 0.5, 0.28, rad * 2 + 0.5, 0x9a8466, 'stone', { deco: 1 }));
-  boxes.push(B(x, 0.05, z, rad * 2 + 0.1, 0.24, rad * 2 + 0.1, 0x5a463a, 'dirt', { deco: 1 }));
+  column(boxes, x, 0, z, rad + 0.28, 0.28, 0x9a8466, { seg: 14, mat: 'stone' });
+  column(boxes, x, 0.05, z, rad + 0.05, 0.24, 0x5a463a, { seg: 14, mat: 'dirt' });
   canopy(boxes, x, z, 0.34, rad, col, 'leaf', colB);
 }
 
@@ -206,6 +343,12 @@ function buildCave() {
     [40, 44, -2, 2],
     [2, 6, 39, 44],
     [-44, -40, -2, 2],
+    // --- 追加: 周回できるループ坑道と枝道 (行き止まりを作らず経路を複雑化) ---
+    [9, 13, -19, -3],      // NE ループ: 北東トンネル網 ↔ 東の本坑
+    [-13, -9, 2, 15],      // SW ループ: 西の本坑 ↔ 南西トンネル網
+    [18, 24, -33, -27],    // 北へ回り込む枝道 (北の大空洞へ別ルート)
+    [18, 22, -33, -19],    // 上を [14,30,-19,-14] につなぐ縦坑
+    [-24, -18, 20, 26],    // 南西の小空洞 (西回廊と南をつなぐ)
   ];
 
   const r1 = [[-14, 14, -14, -11], [-14, 14, 11, 14], [-14, -11, -11, 11], [11, 14, -11, 11]];
@@ -247,6 +390,12 @@ function buildCave() {
   carveRock(boxes, L1, LH, LH, N, OFF, 0x554637, 0x61503e);
   carveRock(boxes, L2, LH * 2, LH, N, OFF, 0x625340, 0x6f5f49);
 
+  // ---- 有機的クラッディング: 平らな箱壁/天井を自然な岩肌に見せる ----
+  const O0 = caveOpenGrid(L0, N, OFF), O1 = caveOpenGrid(L1, N, OFF), O2 = caveOpenGrid(L2, N, OFF);
+  cladCaveLevel(boxes, O0, O1, 0, LH, N, OFF, 0x4a3d31, 0x392f26, 1337, { ceiling: true, floor: true, density: 0.62 });
+  cladCaveLevel(boxes, O1, O2, LH, LH * 2, N, OFF, 0x574739, 0x453930, 2551, { ceiling: true, floor: true, density: 0.5 });
+  cladCaveLevel(boxes, O2, null, LH * 2, LH * 3, N, OFF, 0x63513e, 0x4e4032, 4021, { ceiling: true, floor: true, density: 0.44 });
+
   const RS = 0x5c4c3a;
   const SH = 5 / 16, SD = 0.6;
   boxes.push(...stairs(-12, 0, -34.5, 'n', 3.4, 16, SH, SD, RS));
@@ -265,35 +414,62 @@ function buildCave() {
   boxes.push(B(0, LH, -42, 2.6, 2.5, 2, RS));
   boxes.push(B(0, LH, 42, 2.6, 2.5, 2, RS));
 
-  boxes.push(B(-6, 0, -6, 2.2, 10, 2.2, 0x554435));
-  boxes.push(B(6, 0, 6, 2.0, 10, 2.0, 0x554435));
+  // 中央の岩柱を丸い石柱(円柱)に。当たり判定は従来と同じ軸並行AABB。表面に流れ石を重ねる。
+  for (const [px, pz, pr] of [[-6, -6, 1.1], [6, 6, 1.0]]) {
+    column(boxes, px, 0, pz, pr, 10, 0x554435, { solid: true, seg: 12, rt: 0.78, rb: 1.0 });
+    for (let k = 0; k < 5; k++) {
+      const yy = 1 + k * 1.9, rr = pr * (1.5 - k * 0.12);
+      boulder(boxes, px, yy, pz, rr * 2, 1.7, rr * 2, k % 2 ? 0x4c4030 : 0x574839);
+    }
+    drip(boxes, px, 10, pz, pr * 0.9, 1.6, false, 0x453930);   // 柱上部から垂れる石
+  }
   boxes.push(B(0, 0, 6.5, 2.6, 1.0, 2.6, 0x5c4c3a), B(0, 1.0, 6.5, 1.6, 0.9, 1.6, 0x554435));
+  boulder(boxes, 0, 1.9, 6.5, 2.4, 1.3, 2.4, 0x50412f);
   boxes.push(B(9, 0, -9, 2, 2.2, 2, 0x5c4c3a));
+  boulder(boxes, 9, 2.2, -9, 2.3, 1.2, 2.3, 0x50412f);
   boxes.push(B(9, 2.2, -9, 1.8, 0.5, 1.8, 0x66ddff, 'crystal', { bounce: 1, glow: 1 }));
   boxes.push(B(-6, 0, -33, 1.9, 0.5, 1.9, 0x8f7bff, 'crystal', { bounce: 1, glow: 1 }));
   boxes.push(B(-36, 0, 3, 1.9, 0.5, 1.9, 0x66ddff, 'crystal', { bounce: 1, glow: 1 }));
   boxes.push(B(0, 0, 36, 1.9, 0.5, 1.9, 0x8f7bff, 'crystal', { bounce: 1, glow: 1 }));
 
-  boxes.push(B(34, 0, 2, 9, 0.25, 10, 0x2b6f8f, 'water', { deco: 1, glow: 1 }));
-  boxes.push(B(-34, 0, -3, 6, 0.2, 5, 0x2b6f8f, 'water', { deco: 1 }));
-  boxes.push(B(-30.5, 0, 0, 3, 0.2, 3, 0x2b6f8f, 'water', { deco: 1 }));
+  // 地底湖。水面はやや低くし、縁を岩で不規則に縁取って四角さを消す。
+  const pools = [[34, 2, 9, 10, 0x2b6f8f, 1], [-34, -3, 6, 5, 0x2b6f8f, 0], [-30.5, 0, 3, 3, 0x2b6f8f, 0]];
+  const poolR = mulberry(717);
+  for (const [wx, wz, ww, wd, wc, glow] of pools) {
+    boxes.push(B(wx, -0.08, wz, ww, 0.2, wd, wc, 'water', glow ? { deco: 1, glow: 1 } : { deco: 1 }));
+    const per = Math.ceil((ww + wd) * 0.9);
+    for (let k = 0; k < per; k++) {
+      const t = k / per, edge = Math.floor(poolR() * 4);
+      let ex, ez;
+      if (edge === 0) { ex = wx - ww / 2; ez = wz - wd / 2 + t * wd; }
+      else if (edge === 1) { ex = wx + ww / 2; ez = wz - wd / 2 + t * wd; }
+      else if (edge === 2) { ex = wx - ww / 2 + t * ww; ez = wz - wd / 2; }
+      else { ex = wx - ww / 2 + t * ww; ez = wz + wd / 2; }
+      const rr = 0.5 + poolR() * 0.7;
+      boulder(boxes, ex + (poolR() - 0.5) * 0.5, 0.1, ez + (poolR() - 0.5) * 0.5, rr * 1.4, rr * 0.8, rr * 1.4, poolR() < 0.5 ? 0x4a3d30 : 0x574839);
+    }
+  }
 
   for (let i = 0; i < 5; i++) boxes.push(B(8.7 + i * 1.5, 0, 30.4, 0.22, 3.0, 0.22, 0xe8e0d2, 'bone', { deco: 1 }));
   boxes.push(B(11.5, 3.0, 33.5, 7, 0.3, 7, 0xd8cfc0, 'bone', { deco: 1 }));
   boxes.push(B(4, 0, 36, 2.6, 0.8, 1.2, 0xd8cfc0, 'bone', { deco: 1 }));
   boxes.push(B(16, 0, 27, 1.4, 1.0, 1.4, 0xe8e0d2, 'bone', { deco: 1 }));
 
+  // 石筍 (円錐 + 根元の岩)。以前の積み箱ではなく本物の尖った岩に。
   const stal = [[-13, -35], [8, -31], [-33, -25], [30, -16], [-15, 17], [22, 23], [-36, 5], [36, 6], [12, 34], [-4, 28]];
   for (const [sx, sz] of stal) {
-    boxes.push(B(sx, 0, sz, 0.8, 2.2 + ((sx * 7 + sz * 13) % 10) / 8, 0.8, 0x51443a, 'stone', { deco: 1 }));
-    boxes.push(B(sx + 0.6, 0, sz - 0.4, 0.45, 1.1, 0.45, 0x51443a, 'stone', { deco: 1 }));
+    const h = 2.0 + ((sx * 7 + sz * 13 + 100) % 10) / 6;
+    drip(boxes, sx, 0, sz, 0.55, h, true, 0x51443a);
+    boulder(boxes, sx + 0.3, 0.3, sz - 0.2, 1.3, 0.75, 1.3, 0x4a3d30);
+    drip(boxes, sx + 0.75, 0, sz + 0.45, 0.3, 0.9 + ((sx * 3 + sz) % 4) * 0.25, true, 0x51443a);
   }
 
+  // 鍾乳石 (天井から下向きの円錐)
   const stalac = [[0, -18], [-1, -24], [13, -1], [19, 1], [24, -17], [-13, 0], [-19, -2], [1, 14], [-1, 20], [-22, -30], [29, 14], [-27, 12], [-9, 29], [20, 23], [30, -12]];
   for (const [sx, sz] of stalac) {
-    const h = 0.9 + (((sx * 5 + sz * 11) % 8) + 8) % 8 / 10;
-    boxes.push(B(sx, LH - h, sz, 0.5, h, 0.5, 0x4a3d30, 'stone', { deco: 1 }));
-    boxes.push(B(sx + 0.45, LH - 0.6, sz + 0.3, 0.28, 0.6, 0.28, 0x4a3d30, 'stone', { deco: 1 }));
+    const h = 1.1 + (((sx * 5 + sz * 11) % 8) + 8) % 8 / 8;
+    drip(boxes, sx, LH, sz, 0.34, h, false, 0x4a3d30);
+    drip(boxes, sx + 0.5, LH, sz + 0.35, 0.2, h * 0.6, false, 0x4a3d30);
   }
 
   const moss = [[-8, -8], [7, -4], [-10, -34], [10, -30], [30, 7], [-38, 5], [0, 27], [14, 36], [16, -24], [-28, 17]];
@@ -323,16 +499,29 @@ function buildCave() {
     [-4, 0, 36, 0x88ffcc], [16, 0, 36, 0xffaa66],
     [-16, 10, -16, 0x66ffee], [16, 10, 16, 0xbb88ff], [12, 5, -12.8, 0x88aaff], [-12, 5, 12.8, 0x88ffcc]
   ];
+  // クリスタルの群晶: 尖った六角柱(先細り円柱)を数本、少し傾けて生やす。
+  const cryR = mulberry(555);
   for (const [cx, cy, cz, cc] of crys) {
-    boxes.push(B(cx, cy, cz, 0.7, 1.6, 0.7, cc, 'crystal', { deco: 1, glow: 1 }));
-    boxes.push(B(cx + 0.5, cy, cz - 0.3, 0.4, 0.9, 0.4, cc, 'crystal', { deco: 1, glow: 1 }));
+    const shards = 3 + (cryR() * 3 | 0);
+    for (let s = 0; s < shards; s++) {
+      const ang = cryR() * Math.PI * 2, dist = cryR() * 0.55;
+      const h = 0.9 + cryR() * 1.4, rad = 0.16 + cryR() * 0.18;
+      const tilt = (cryR() - 0.5) * 0.5;
+      boxes.push({ x: cx + Math.cos(ang) * dist, y: cy, z: cz + Math.sin(ang) * dist,
+        w: rad * 2, h, d: rad * 2, c: cc, m: 'crystal', deco: 1, glow: 1,
+        shape: 'cyl', rt: 0.04, rb: 1, seg: 6, rx: Math.sin(ang) * tilt, rz: -Math.cos(ang) * tilt });
+    }
   }
 
-  // 中央シャフト頂部の岩天井 — 空の黒い抜けを塞ぎ、閉じた洞窟らしくする (deco=当たり判定なし)
-  boxes.push(B(0, 15, 0, 30, 2.4, 30, 0x2a2119, 'stone', { deco: 1 }));
-  boxes.push(B(0, 14.5, 0, 23, 0.6, 23, 0x241d16, 'stone', { deco: 1 }));
-  for (const [hx, hz] of [[-6, -5], [7, 4], [-8, 6], [5, -7], [0, 0]]) {
-    boxes.push(B(hx, 13.7, hz, 1.4, 1.1, 1.4, 0x2a2119, 'stone', { deco: 1 }));
+  // 中央シャフト頂部の岩ドーム — 丸い天井で黒い抜けを塞ぎ、鍾乳石を垂らす (deco=当たり判定なし)
+  boxes.push(B(0, 15.4, 0, 38, 2.0, 38, 0x2a2119, 'stone', { deco: 1 }));   // 頂部の岩盤(抜け防止)
+  boulder(boxes, 0, 17.5, 0, 40, 9, 40, 0x2a2119);                          // 伏せた大ドーム
+  boulder(boxes, 0, 16.0, 0, 30, 6, 30, 0x241d16);
+  const domeR = mulberry(909);
+  for (let a = 0; a < 16; a++) {
+    const ang = domeR() * Math.PI * 2, rad = 3 + domeR() * 8.5;
+    drip(boxes, Math.cos(ang) * rad, 14.4, Math.sin(ang) * rad, 0.24 + domeR() * 0.42, 1.4 + domeR() * 3.0, false, 0x2a2119);
+    if (domeR() < 0.5) boulder(boxes, Math.cos(ang) * rad, 14.2, Math.sin(ang) * rad, 2.0 + domeR() * 1.6, 1.2, 2.0 + domeR() * 1.6, 0x241d16);
   }
 
   return {
@@ -383,9 +572,13 @@ function buildMall() {
   boxes.push(B(-36, 0, -8, 2.6, 0.95, 1.1, 0xd0d5da, 'metal'), B(-36, 0, 8, 2.6, 0.95, 1.1, 0xd0d5da, 'metal'));
   boxes.push(B(-45, 3.3, -24.5, 16, 1.1, 0.3, 0xc42a76, 'sign', { deco: 1, glow: 1 }));
 
-  boxes.push(B(2, 0, 0, 5.2, 0.65, 5.2, 0xdfe8ee, 'tile'));
-  boxes.push(B(2, 0.65, 0, 3.8, 0.25, 3.8, 0x58b8e8, 'water', { deco: 1, glow: 1 }));
-  boxes.push(B(2, 0.65, 0, 0.9, 2.2, 0.9, 0xdfe8ee, 'tile'));
+  // 円形の噴水: 丸い水盤 + 縁 + 中央の段付き柱 (水盤は当たり判定あり=AABBは従来と同じ)
+  column(boxes, 2, 0, 0, 2.6, 0.65, 0xdfe8ee, { solid: true, seg: 20, mat: 'tile' });
+  column(boxes, 2, 0.5, 0, 2.6, 0.2, 0xeef4f8, { seg: 20, mat: 'tile' });     // 縁
+  column(boxes, 2, 0.55, 0, 2.1, 0.16, 0x58b8e8, { seg: 20, mat: 'water', glow: 1 });
+  column(boxes, 2, 0.65, 0, 0.42, 1.7, 0xdfe8ee, { seg: 12, mat: 'tile', rt: 0.7 });
+  column(boxes, 2, 1.5, 0, 0.75, 0.18, 0xeef4f8, { seg: 14, mat: 'tile' });   // 上段の受け皿
+  column(boxes, 2, 1.68, 0, 0.55, 0.12, 0x58b8e8, { seg: 14, mat: 'water', glow: 1 });
   for (const [px, pz] of [[-5, -12], [9, -12], [-5, 12], [9, 12]]) {
     boxes.push(B(px, 0, pz, 1.8, 0.75, 1.8, 0x8a7a64, 'wood'));
     canopy(boxes, px, pz, 0.75, 0.72, 0x4a9b52);
@@ -727,8 +920,15 @@ function buildSchool() {
   boxes.push(B(-12, ROOF, -34, 3.2, 2.8, 3.2, 0x98a2ac, 'metal'));
   boxes.push(B(10, ROOF, -34, 5, 0.6, 2, 0xb0b8c0, 'metal'));
 
-  boxes.push(B(0, 0, -14, 6.5, 0.35, 4.5, 0xbfd8e8, 'tile'));
-  boxes.push(B(0, 0.35, -14, 5.2, 0.15, 3.2, 0x58b8e8, 'water', { deco: 1, glow: 1 }));
+  // 中庭の池: 楕円の水盤 + 自然石の縁取り
+  boxes.push({ x: 0, y: 0, z: -14, w: 6.5, h: 0.32, d: 4.5, c: 0xbfd8e8, m: 'tile', shape: 'cyl', seg: 20 });
+  boxes.push({ x: 0, y: 0.28, z: -14, w: 5.2, h: 0.12, d: 3.2, c: 0x58b8e8, m: 'water', deco: 1, glow: 1, shape: 'cyl', seg: 20 });
+  const pondR = mulberry(4242);
+  for (let k = 0; k < 16; k++) {
+    const a = (k / 16) * Math.PI * 2, rx = 3.4 + pondR() * 0.3, rz = 2.4 + pondR() * 0.3;
+    const rr = 0.35 + pondR() * 0.35;
+    boulder(boxes, Math.cos(a) * rx, 0.12, -14 + Math.sin(a) * rz, rr * 1.5, rr, rr * 1.5, pondR() < 0.5 ? 0x9a8f80 : 0x7d7566);
+  }
   for (const [px, pz] of [[-12, -18], [12, -18], [-12, -4], [12, -4]]) {
     boxes.push(B(px, 0, pz, 2.2, 0.6, 2.2, 0x8a6a44, 'wood'));
     canopy(boxes, px, pz, 0.6, 0.78, 0x4a9b52);
